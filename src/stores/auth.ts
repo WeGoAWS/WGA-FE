@@ -169,6 +169,7 @@ export const useAuthStore = defineStore('auth', {
                     access_token: this.tokens.accessToken,
                     refresh_token: this.tokens.refreshToken,
                     provider: 'cognito',
+                    withCredentials: true
                 });
 
                 console.log('Token verification response:', response.data);
