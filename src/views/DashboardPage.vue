@@ -1,77 +1,70 @@
-.dashboard-container { max-width: 1000px; margin: 0 auto; padding: 2rem; } .dashboard-header {
-display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;
-padding-bottom: 1rem; border-bottom: 1px solid #eee; } .logout-button { padding: 0.5rem 1rem;
-background-color: #232F3E; color: white; border: none; border-radius: 4px; cursor: pointer;
-font-weight: 500; transition: background-color 0.2s; } .logout-button:hover { background-color:
-#364759; } .user-info-card { background-color: white; border-radius: 8px; padding: 1.5rem;
-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); margin-bottom: 2rem; } .user-details { margin-top: 1rem; }
-.user-field { display: flex; margin-bottom: 0.5rem; } .field-label { min-width: 100px; font-weight:
-600; color: #555; } .token-info { margin-top: 2rem; } .token-card { background-color: white;
-border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); margin-bottom: 1rem;
-} .token-preview { padding: 1rem; background-color: #f3f3f3; border-radius: 4px; font-family:
-monospace; overflow-x: auto; white-space: nowrap; margin-top: 0.5rem; }<!-- src/views/DashboardPage.vue -->
 <template>
-    <div class="dashboard-container">
-        <header class="dashboard-header">
-            <h1>대시보드</h1>
-            <button @click="handleLogout" class="logout-button">로그아웃</button>
-        </header>
+    <AppLayout>
+        <div class="dashboard-container">
+            <header class="dashboard-header">
+                <h1>대시보드</h1>
+            </header>
 
-        <div class="user-info-card">
-            <h2>사용자 정보</h2>
-            <div v-if="user" class="user-details">
-                <div class="user-field">
-                    <span class="field-label">이메일:</span>
-                    <span class="field-value">{{ user.email }}</span>
+            <div class="user-info-card">
+                <h2>사용자 정보</h2>
+                <div v-if="user" class="user-details">
+                    <div class="user-field">
+                        <span class="field-label">이메일:</span>
+                        <span class="field-value">{{ user.email }}</span>
+                    </div>
+                    <div class="user-field">
+                        <span class="field-label">사용자명:</span>
+                        <span class="field-value">{{
+                            user.username || user['cognito:username'] || 'N/A'
+                        }}</span>
+                    </div>
+                    <div class="user-field">
+                        <span class="field-label">인증 시간:</span>
+                        <span class="field-value">{{ formatDate(user.auth_time) }}</span>
+                    </div>
                 </div>
-                <div class="user-field">
-                    <span class="field-label">사용자명:</span>
-                    <span class="field-value">{{
-                        user.username || user['cognito:username'] || 'N/A'
-                    }}</span>
+                <p v-else>사용자 정보를 불러오는 중...</p>
+            </div>
+
+            <div class="token-info">
+                <h2>토큰 정보</h2>
+
+                <div class="token-card">
+                    <h3>ID 토큰</h3>
+                    <div class="token-preview">
+                        {{ truncateToken(tokens.idToken) }}
+                    </div>
                 </div>
-                <div class="user-field">
-                    <span class="field-label">인증 시간:</span>
-                    <span class="field-value">{{ formatDate(user.auth_time) }}</span>
+
+                <div class="token-card">
+                    <h3>액세스 토큰</h3>
+                    <div class="token-preview">
+                        {{ truncateToken(tokens.accessToken) }}
+                    </div>
+                </div>
+
+                <div class="token-card">
+                    <h3>리프레시 토큰</h3>
+                    <div class="token-preview">
+                        {{ truncateToken(tokens.refreshToken) }}
+                    </div>
                 </div>
             </div>
-            <p v-else>사용자 정보를 불러오는 중...</p>
         </div>
-
-        <div class="token-info">
-            <h2>토큰 정보</h2>
-
-            <div class="token-card">
-                <h3>ID 토큰</h3>
-                <div class="token-preview">
-                    {{ truncateToken(tokens.idToken) }}
-                </div>
-            </div>
-
-            <div class="token-card">
-                <h3>액세스 토큰</h3>
-                <div class="token-preview">
-                    {{ truncateToken(tokens.accessToken) }}
-                </div>
-            </div>
-
-            <div class="token-card">
-                <h3>리프레시 토큰</h3>
-                <div class="token-preview">
-                    {{ truncateToken(tokens.refreshToken) }}
-                </div>
-            </div>
-        </div>
-    </div>
+    </AppLayout>
 </template>
 
 <script lang="ts">
     import { computed, defineComponent, onMounted } from 'vue';
     import { useRouter } from 'vue-router';
     import { useAuthStore } from '@/stores/auth';
+    import AppLayout from '@/layouts/AppLayout.vue';
 
     export default defineComponent({
         name: 'DashboardPage',
+        components: {
+            AppLayout,
+        },
 
         setup() {
             const router = useRouter();
