@@ -43,28 +43,19 @@ const router = createRouter({
 });
 
 // 네비게이션 가드
-router.beforeEach(async (to, from, next) => {
+router.beforeEach((to, from, next) => {
     const authStore = useAuthStore();
     const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
 
-    if (requiresAuth) {
-        // 인증 상태 확인 (백엔드와 통신)
-        try {
-            const isAuthenticated = await authStore.handleTokenFromBackend();
-
-            if (!isAuthenticated) {
-                // 인증이 안 되어 있다면 로그인 페이지로
-                next('/login');
-            } else {
-                // 인증 OK
-                next();
-            }
-        } catch (error) {
-            console.error('Navigation guard error:', error);
-            next('/login');
-        }
+    // isAuthenticated 상태만 확인 (handleTokenFromBackend 호출 없음)
+    if (requiresAuth && !authStore.isAuthenticated) {
+        // 인증이 필요한 페이지인데 인증이 안 되어 있을 때
+        next('/login');
+    } else if (to.path === '/login' && authStore.isAuthenticated) {
+        // 이미 로그인되어 있으면 대시보드로 리다이렉트
+        next('/dashboard');
     } else {
-        // 인증이 필요 없는 페이지
+        // 그 외의 경우
         next();
     }
 });
