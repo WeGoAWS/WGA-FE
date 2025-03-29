@@ -164,13 +164,18 @@ export const useAuthStore = defineStore('auth', {
                 const apiUrl = import.meta.env.API_URL || 'http://localhost:8000';
 
                 // 백엔드에 토큰 검증 요청
-                const response = await axios.post(`${apiUrl}/auth/verify-token`, {
-                    id_token: this.tokens.idToken,
-                    access_token: this.tokens.accessToken,
-                    refresh_token: this.tokens.refreshToken,
-                    provider: 'cognito',
-                    withCredentials: true
-                });
+                const response = await axios.post(
+                    `${apiUrl}/auth/verify-token`,
+                    {
+                        id_token: this.tokens.idToken,
+                        access_token: this.tokens.accessToken,
+                        refresh_token: this.tokens.refreshToken,
+                        provider: 'cognito',
+                    },
+                    {
+                        withCredentials: true,
+                    },
+                );
 
                 console.log('Token verification response:', response.data);
                 return response.data && response.data.status === 'success';
