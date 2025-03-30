@@ -124,15 +124,6 @@
                                 <div v-if="activeUserTab" class="user-permissions">
                                     <div class="user-header">
                                         <h3>{{ formatUserName(activeUserTab) }}의 권한 관리</h3>
-                                        <div class="user-actions">
-                                            <button 
-                                                @click="applyChangesForUser(activeUserTab)" 
-                                                class="apply-user-button"
-                                                :disabled="!hasChangesForUser(activeUserTab) || store.submitting"
-                                            >
-                                                {{ store.submitting ? '적용 중...' : '이 사용자의 변경사항 적용' }}
-                                            </button>
-                                        </div>
                                     </div>
                                     
                                     <div class="permissions-grid">
@@ -383,12 +374,9 @@
             const handleCheckboxChange = (event: Event, permission: any, type: 'add' | 'remove', userArn: string) => {
                 console.log(`체크박스 변경: ${userArn}, ${type}, ${permission.action}, 상태: ${permission.apply}`);
                 
-                // 해당 사용자의 모든 권한 상태 업데이트를 위해 특별한 처리는 필요 없음
-                // reactive 객체가 직접 업데이트됨
-                
-                // hasChangesForUser와 hasAnyChanges가 정확히 계산되도록 상태 업데이트 트리거
+                // reactive 객체가 직접 업데이트됨, 추가 처리 필요 없음
                 nextTick(() => {
-                    // 강제 리렌더링은 필요 없음
+                    // 업데이트 이후 필요한 작업이 있다면 여기에 추가
                 });
             };
 
@@ -411,26 +399,44 @@
                 return store.userArns.some(arn => hasChangesForUser(arn));
             });
 
-            // 한 사용자의 변경사항만 적용
-            const applyChangesForUser = async (userArn: string) => {
-                if (!hasChangesForUser(userArn)) return;
-                
-                try {
-                    await store.applyPolicyChangesForUser(userArn);
-                    console.log(`${formatUserName(userArn)}의 변경사항 적용 완료`);
-                } catch (err) {
-                    console.error('변경사항 적용 오류:', err);
-                }
-            };
-
             // 모든 변경사항 적용
             const applyAllChanges = async () => {
                 try {
                     // 변경사항이 있는 모든 사용자에 대해 적용
                     const usersWithChanges = store.userArns.filter(arn => hasChangesForUser(arn));
-                    if (usersWithChanges.length === 0) return;
+                    if (usersWithChanges.length === 0) {
+                        console.log('적용할 변경사항이 없습니다.');
+                        return;
+                    }
                     
-                    await store.applyPolicyChanges();
+                    // 각 사용자에 대한 변경 사항을 일괄 처리하기 위한 배열 준비
+                    const policyUpdates = [];
+                    
+                    // 각 사용자별로 변경사항 수집
+                    for (const userArn of usersWithChanges) {
+                        const userPerms = getUserPermissions(userArn);
+                        
+                        // 해당 사용자의 선택된 권한만 필터링
+                        const addPermissions = userPerms.add.filter(p => p.apply);
+                        const removePermissions = userPerms.remove.filter(p => p.apply);
+                        
+                        // 권한 객체에서 필요 없는 ID 필드 제거 및 포맷 맞추기
+                        const formattedAddPermissions = addPermissions.map(({id, ...rest}) => rest);
+                        const formattedRemovePermissions = removePermissions.map(({id, ...rest}) => rest);
+                        
+                        // 사용자별 변경사항을 배열에 추가
+                        policyUpdates.push({
+                            user_arn: userArn,
+                            add_permissions: formattedAddPermissions,
+                            remove_permissions: formattedRemovePermissions
+                        });
+                    }
+                    
+                    console.log('적용할 변경사항:', policyUpdates);
+                    
+                    // 백엔드 API 호출하여 변경사항 적용
+                    await store.applyPolicyChanges(policyUpdates);
+                    
                     console.log('모든 변경사항 적용 완료');
                 } catch (err) {
                     console.error('변경사항 적용 오류:', err);
@@ -468,7 +474,6 @@
                 countChangesForUser,
                 hasAnyChanges,
                 handleCheckboxChange,
-                applyChangesForUser,
                 applyAllChanges,
                 formatUserName,
                 userPermissionsReactive
@@ -737,31 +742,6 @@
         color: #333;
     }
 
-    .user-actions {
-        display: flex;
-        gap: 10px;
-    }
-
-    .apply-user-button {
-        padding: 8px 15px;
-        background-color: #28a745;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.9rem;
-        transition: background-color 0.2s;
-    }
-
-    .apply-user-button:hover:not(:disabled) {
-        background-color: #218838;
-    }
-
-    .apply-user-button:disabled {
-        background-color: #cccccc;
-        cursor: not-allowed;
-    }
-
     .global-action-bar {
         margin-top: 20px;
         display: flex;
@@ -829,6 +809,18 @@
         padding: 30px;
         text-align: center;
         color: #6c757d;
+    }
+
+    .permissions-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .permissions-grid {
+            grid-template-columns: 1fr;
+        }
     }
 
     .add-permissions, .remove-permissions {
