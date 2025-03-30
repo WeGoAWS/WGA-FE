@@ -4,16 +4,25 @@
         <div class="card-header">
             <h3>{{ title || `분석 결과 #${index + 1}` }}</h3>
             <div class="metadata">
-                <span class="date">{{ formatDate(result.analysis_timestamp) }}</span>
-                <span class="user">사용자: {{ result.user }}</span>
+                <span class="date">{{ formatDate(result.date) }}</span>
+                <span class="user">사용자: {{ formatUserName(result.user) }}</span>
                 <span class="log-count">분석 로그: {{ result.log_count }}개</span>
             </div>
         </div>
 
         <div class="card-body">
+            <div class="risk-info">
+                <div :class="['risk-badge', getRiskClass(result.risk_classification)]">
+                    {{ result.risk_classification }}
+                </div>
+                <div :class="['severity-badge', getSeverityClass(result.severity)]">
+                    {{ result.severity }}
+                </div>
+            </div>
+
             <div class="analysis-comment">
-                <h4>분석 코멘트</h4>
-                <p>{{ result.analysis_comment }}</p>
+                <h4>요약</h4>
+                <p>{{ result.summary }}</p>
             </div>
 
             <div class="policy-recommendations">
@@ -54,7 +63,7 @@
                     <p v-else class="empty-list">추가 권장 권한이 없습니다.</p>
                 </div>
 
-                <div class="reason">
+                <div v-if="result.policy_recommendation.Reason" class="reason">
                     <h5>추천 이유</h5>
                     <p>{{ result.policy_recommendation.Reason }}</p>
                 </div>
@@ -104,6 +113,7 @@
             const expanded = ref(false);
             const savingResult = ref(false);
 
+            // 날짜 포맷팅 함수
             const formatDate = (dateString: string): string => {
                 try {
                     const date = new Date(dateString);
@@ -111,11 +121,53 @@
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
                     });
                 } catch (e) {
                     return dateString;
+                }
+            };
+
+            // ARN 형식의 사용자 정보를 보기 좋게 변환
+            const formatUserName = (user: string): string => {
+                if (user && user.startsWith('arn:aws:')) {
+                    // ARN에서 역할 이름만 추출
+                    const parts = user.split('/');
+                    if (parts.length > 1) {
+                        return parts[parts.length - 1];
+                    }
+                }
+                return user || 'Unknown';
+            };
+
+            // 위험 분류에 따른 클래스 반환
+            const getRiskClass = (risk: string): string => {
+                if (!risk) return 'normal-risk';
+
+                switch (risk.toLowerCase()) {
+                    case 'high':
+                        return 'high-risk';
+                    case 'medium':
+                        return 'medium-risk';
+                    case 'low':
+                        return 'low-risk';
+                    case 'normal':
+                    default:
+                        return 'normal-risk';
+                }
+            };
+
+            // 심각도에 따른 클래스 반환
+            const getSeverityClass = (severity: string): string => {
+                if (!severity) return 'low-severity';
+
+                switch (severity.toLowerCase()) {
+                    case 'high':
+                        return 'high-severity';
+                    case 'medium':
+                        return 'medium-severity';
+                    case 'low':
+                    default:
+                        return 'low-severity';
                 }
             };
 
@@ -151,6 +203,9 @@
                 expanded,
                 savingResult,
                 formatDate,
+                formatUserName,
+                getRiskClass,
+                getSeverityClass,
                 toggleExpanded,
                 copyToClipboard,
                 saveResult,
@@ -189,6 +244,58 @@
 
     .card-body {
         padding: 20px;
+    }
+
+    .risk-info {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+
+    .risk-badge,
+    .severity-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .high-risk {
+        background-color: #ffebee;
+        color: #c62828;
+        border: 1px solid #ef9a9a;
+    }
+
+    .medium-risk {
+        background-color: #fff3e0;
+        color: #e65100;
+        border: 1px solid #ffcc80;
+    }
+
+    .low-risk,
+    .normal-risk {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #a5d6a7;
+    }
+
+    .high-severity {
+        background-color: #ffebee;
+        color: #c62828;
+        border: 1px solid #ef9a9a;
+    }
+
+    .medium-severity {
+        background-color: #fff3e0;
+        color: #e65100;
+        border: 1px solid #ffcc80;
+    }
+
+    .low-severity {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #a5d6a7;
     }
 
     .analysis-comment {

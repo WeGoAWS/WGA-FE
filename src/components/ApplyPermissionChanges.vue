@@ -75,7 +75,7 @@
 </template>
 
 <script lang="ts">
-    import { computed, defineComponent, onMounted, ref } from 'vue';
+    import { computed, defineComponent, onMounted, ref, watch } from 'vue';
     import policyService, { PermissionChange, PolicyUpdates } from '@/services/policyService';
 
     export default defineComponent({
@@ -202,6 +202,13 @@
                 }
             };
 
+            // selectedUserArn을 감시하는 watch 함수 설정
+            watch(selectedUserArn, (newValue) => {
+                if (newValue !== undefined) {
+                    watchUserArn(newValue);
+                }
+            });
+
             // 사용자 ARN 목록 로드
             const loadUserArns = async () => {
                 loading.value = true;
@@ -238,18 +245,6 @@
 
             onMounted(() => {
                 loadUserArns();
-            });
-
-            // selectedUserArn 값이 변경될 때마다 watchUserArn 함수 호출
-            const updateSelectedUserArn = (value: string) => {
-                selectedUserArn.value = value;
-                watchUserArn(value);
-            };
-
-            // selectedUserArn에 대한 getter와 setter를 생성
-            Object.defineProperty(selectedUserArn, 'value', {
-                get: () => selectedUserArn.value,
-                set: updateSelectedUserArn,
             });
 
             return {

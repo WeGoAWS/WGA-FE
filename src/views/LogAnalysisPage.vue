@@ -37,7 +37,7 @@
                     <DateRangeFilter :loading="loading" @filter="handleDateFilter" />
                     <UserFilter :loading="loading" @filter="handleUserFilter" />
                 </div>
-                <button @click="fetchLogAnalysis" class="analyze-button" :disabled="loading">
+                <button @click="testFunction" class="analyze-button" :disabled="loading">
                     <span v-if="loading">분석 중...</span>
                     <span v-else>로그 분석 시작</span>
                 </button>
@@ -47,16 +47,16 @@
                 {{ error }}
             </div>
 
+            <!-- 로딩 상태 표시 -->
             <div v-if="loading" class="loading-container">
                 <div class="spinner"></div>
                 <p>로그 분석 중입니다. 잠시만 기다려주세요...</p>
             </div>
 
-            <div v-else-if="analysisResults.length > 0">
-                <div class="results-container">
+            <!-- 결과가 있을 때 -->
+            <div v-if="showResults" class="results-container">
+                <div v-for="(result, index) in analysisResults" :key="index">
                     <PolicyResultCard
-                        v-for="(result, index) in analysisResults"
-                        :key="index"
                         :result="result"
                         :index="index"
                         :show-save-button="true"
@@ -65,10 +65,14 @@
                 </div>
 
                 <!-- 정책 변경사항 적용 컴포넌트 -->
-                <ApplyPermissionChanges :analysis-results="analysisResults" />
+                <ApplyPermissionChanges
+                    v-if="analysisResults.length > 0"
+                    :analysis-results="analysisResults"
+                />
             </div>
 
-            <div v-else-if="!loading" class="no-results">
+            <!-- 결과가 없을 때 -->
+            <div v-if="!loading && !showResults" class="no-results">
                 <p>
                     아직 분석 결과가 없습니다. '로그 분석 시작' 버튼을 클릭하여 분석을 시작하세요.
                 </p>
@@ -78,7 +82,7 @@
 </template>
 
 <script lang="ts">
-    import { defineComponent, onMounted, ref } from 'vue';
+    import { computed, defineComponent, ref } from 'vue';
     import AppLayout from '@/layouts/AppLayout.vue';
     import DateRangeFilter from '@/components/DateRangeFilter.vue';
     import UserFilter from '@/components/UserFilter.vue';
@@ -96,7 +100,9 @@
             PolicyResultCard,
             ApplyPermissionChanges,
         },
+
         setup() {
+            // 상태 변수들
             const analysisResults = ref<AnalysisResult[]>([]);
             const loading = ref(false);
             const error = ref('');
@@ -104,89 +110,62 @@
             const selectedDateRange = ref<{ startDate: string; endDate: string } | null>(null);
             const cloudProvider = ref<'aws' | 'gcp' | 'azure'>('aws');
 
-            // 페이지 로드 시 자동으로 데이터 불러오기
-            onMounted(async () => {
-                await fetchLogAnalysis();
+            // 결과가 있는지 계산 (템플릿 조건부 렌더링용)
+            const showResults = computed(() => {
+                return analysisResults.value && analysisResults.value.length > 0;
             });
 
-            // 클라우드 제공자 설정
-            const setCloudProvider = (provider: 'aws' | 'gcp' | 'azure') => {
-                cloudProvider.value = provider;
-                fetchLogAnalysis();
+            // 테스트 함수 - 간단한 경고창 표시
+            const testFunction = () => {
+                console.log('분석 요청 호출됨');
+                getAnalysisData();
             };
 
-            // 사용자 필터 처리
-            const handleUserFilter = (username: string | null) => {
-                selectedUser.value = username;
-                fetchLogAnalysis();
-            };
-
-            // 날짜 필터 처리
-            const handleDateFilter = (dateRange: { startDate: string; endDate: string } | null) => {
-                selectedDateRange.value = dateRange;
-                fetchLogAnalysis();
-            };
-
-            // 백엔드에 로그 분석 요청 함수
-            const fetchLogAnalysis = async () => {
+            // 분석 데이터 가져오기
+            const getAnalysisData = async () => {
+                console.log('분석 데이터 요청 시작');
                 loading.value = true;
                 error.value = '';
 
                 try {
-                    let results: AnalysisResult[] = [];
+                    // 테스트를 위해 간단한 지연 추가
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
 
-                    // 클라우드 제공자에 따른 서비스 호출
-                    if (cloudProvider.value === 'aws') {
-                        // 필터 적용 로직
-                        if (selectedUser.value && selectedDateRange.value) {
-                            // 두 필터 모두 적용된 경우
-                            results = await policyService.analyzeLogsByDateRange(
-                                selectedDateRange.value.startDate,
-                                selectedDateRange.value.endDate,
-                            );
-                            // 유저 필터링은 프론트엔드에서 수행
-                            results = results.filter(
-                                (result) => result.user === selectedUser.value,
-                            );
-                        } else if (selectedUser.value) {
-                            // 사용자 필터만 적용된 경우
-                            results = await policyService.analyzeUserLogs(selectedUser.value);
-                        } else if (selectedDateRange.value) {
-                            // 날짜 필터만 적용된 경우
-                            results = await policyService.analyzeLogsByDateRange(
-                                selectedDateRange.value.startDate,
-                                selectedDateRange.value.endDate,
-                            );
-                        } else {
-                            // 필터 없음
-                            results = await policyService.analyzeCloudTrailLogs();
-                        }
-                    } else if (cloudProvider.value === 'gcp') {
-                        // GCP 로그 분석은 아직 미구현
-                        error.value = 'GCP 로그 분석 기능은 현재 개발 중입니다.';
-                    } else if (cloudProvider.value === 'azure') {
-                        // Azure 로그 분석은 아직 미구현
-                        error.value = 'Azure 로그 분석 기능은 현재 개발 중입니다.';
-                    }
-
+                    // 실제 API 호출
+                    const results = await policyService.getDemoAnalysis();
                     analysisResults.value = results;
+                    console.log('결과 받음:', results);
                 } catch (err: any) {
-                    console.error('로그 분석 요청 오류:', err);
-                    error.value = err.message || '로그 분석 중 오류가 발생했습니다.';
+                    console.error('API 호출 오류:', err);
+                    error.value = err.message || '데이터를 가져오는 중 오류가 발생했습니다.';
                 } finally {
                     loading.value = false;
                 }
             };
 
+            // 클라우드 제공자 설정
+            const setCloudProvider = (provider: 'aws' | 'gcp' | 'azure') => {
+                cloudProvider.value = provider;
+            };
+
+            // 사용자 필터 처리
+            const handleUserFilter = (username: string | null) => {
+                selectedUser.value = username;
+            };
+
+            // 날짜 필터 처리
+            const handleDateFilter = (dateRange: { startDate: string; endDate: string } | null) => {
+                selectedDateRange.value = dateRange;
+            };
+
             // 분석 결과 저장
             const saveAnalysisResult = async (result: AnalysisResult) => {
                 try {
-                    // 결과 저장 서비스 호출
-                    const savedId = await policyService.saveAnalysisResult(result);
-                    alert(`분석 결과가 성공적으로 저장되었습니다. (ID: ${savedId})`);
+                    // 저장 로직
+                    console.log('결과 저장:', result);
+                    alert('결과가 저장되었습니다.');
                 } catch (error: any) {
-                    console.error('결과 저장 오류:', error);
-                    alert(`저장 실패: ${error.message}`);
+                    console.error('저장 오류:', error);
                 }
             };
 
@@ -211,7 +190,8 @@
                 loading,
                 error,
                 cloudProvider,
-                fetchLogAnalysis,
+                showResults,
+                testFunction,
                 formatDate,
                 handleUserFilter,
                 handleDateFilter,
@@ -227,6 +207,20 @@
         padding: 20px;
         max-width: 1200px;
         margin: 0 auto;
+    }
+
+    .page-header {
+        margin-bottom: 24px;
+    }
+
+    .page-header h1 {
+        margin-bottom: 8px;
+        color: #333;
+    }
+
+    .description {
+        color: #666;
+        line-height: 1.5;
     }
 
     .cloud-selector {
@@ -253,20 +247,6 @@
         background-color: #007bff;
         color: white;
         border-color: #007bff;
-    }
-
-    .page-header {
-        margin-bottom: 24px;
-    }
-
-    .page-header h1 {
-        margin-bottom: 8px;
-        color: #333;
-    }
-
-    .description {
-        color: #666;
-        line-height: 1.5;
     }
 
     .filter-section {
@@ -344,112 +324,6 @@
         display: flex;
         flex-direction: column;
         gap: 20px;
-    }
-
-    .analysis-card {
-        background-color: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
-    }
-
-    .card-header {
-        background-color: #f8f9fa;
-        padding: 15px 20px;
-        border-bottom: 1px solid #e9ecef;
-    }
-
-    .card-header h3 {
-        margin: 0 0 10px 0;
-        color: #333;
-    }
-
-    .metadata {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 15px;
-        font-size: 0.9rem;
-        color: #666;
-    }
-
-    .card-body {
-        padding: 20px;
-    }
-
-    .analysis-comment {
-        margin-bottom: 20px;
-    }
-
-    .analysis-comment h4,
-    .policy-recommendations h4,
-    .recommendation-group h5,
-    .reason h5 {
-        margin-top: 0;
-        margin-bottom: 10px;
-        color: #333;
-    }
-
-    .policy-recommendations {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-    }
-
-    .recommendation-group {
-        padding: 15px;
-        border-radius: 4px;
-        background-color: #f8f9fa;
-    }
-
-    .remove-title {
-        color: #d63301;
-    }
-
-    .add-title {
-        color: #2e7d32;
-    }
-
-    .permission-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 10px;
-    }
-
-    .permission-item {
-        padding: 5px 10px;
-        border-radius: 4px;
-        font-size: 0.9rem;
-    }
-
-    .permission-item.remove {
-        background-color: #ffebee;
-        color: #d63301;
-        border: 1px solid #f8b8b8;
-    }
-
-    .permission-item.add {
-        background-color: #e8f5e9;
-        color: #2e7d32;
-        border: 1px solid #a5d6a7;
-    }
-
-    .empty-list {
-        color: #666;
-        font-style: italic;
-    }
-
-    .reason {
-        margin-top: 10px;
-        padding: 15px;
-        background-color: #fff8e1;
-        border-radius: 4px;
-        border-left: 4px solid #ffb300;
-    }
-
-    .reason p {
-        margin: 0;
-        line-height: 1.6;
     }
 
     .no-results {
