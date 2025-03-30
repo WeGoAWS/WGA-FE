@@ -3,6 +3,11 @@ import { defineStore } from 'pinia';
 import policyService from '@/services/policyService';
 import type { PermissionChange, PolicyRecommendation, AnalysisResult, PolicyUpdates } from '@/services/policyService';
 
+// 각 사용자별 권한에 고유 ID 부여하여 독립성 확보
+interface PermissionChangeWithId extends PermissionChange {
+  id: string;  // 고유 식별자 추가
+}
+
 interface PermissionsState {
   loading: boolean;
   error: string;
@@ -12,8 +17,8 @@ interface PermissionsState {
   userArns: string[];
   selectedUserArns: string[]; // 다중 선택을 위한 배열
   userPermissionsMap: Map<string, {
-    add: PermissionChange[];
-    remove: PermissionChange[];
+    add: PermissionChangeWithId[];
+    remove: PermissionChangeWithId[];
   }>;
   combinedAddPermissions: PermissionChange[];
   combinedRemovePermissions: PermissionChange[];
@@ -175,7 +180,6 @@ export const usePermissionsStore = defineStore('permissions', {
       this.updateCombinedPermissions();
     },
 
-    // 모든 사용자의 권한 정보 추출
     // 모든 사용자의 권한 정보 추출 (정확한 이름 매칭 사용)
     extractAllUserPermissions() {
       // 사용자별 권한 맵 초기화
@@ -216,8 +220,8 @@ export const usePermissionsStore = defineStore('permissions', {
         }
 
         // 권한 목록 초기화
-        const addPerms: PermissionChange[] = [];
-        const removePerms: PermissionChange[] = [];
+        const addPerms: PermissionChangeWithId[] = [];
+        const removePerms: PermissionChangeWithId[] = [];
 
         // 각 분석 결과에서 권한 추출
         userResults.forEach((result: AnalysisResult) => {
@@ -226,7 +230,11 @@ export const usePermissionsStore = defineStore('permissions', {
             if (result.policy_recommendation.ADD && Array.isArray(result.policy_recommendation.ADD)) {
               result.policy_recommendation.ADD.forEach((action: string) => {
                 if (!addPerms.some((p) => p.action === action)) {
+                  // 고유 ID 생성: 사용자 이름 + 액션 이름 + 타임스탬프
+                  const uniqueId = `${userArn}-add-${action}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                  
                   addPerms.push({
+                    id: uniqueId,
                     action,
                     apply: false,
                     reason: result.policy_recommendation.Reason || '',
@@ -239,7 +247,11 @@ export const usePermissionsStore = defineStore('permissions', {
             if (result.policy_recommendation.REMOVE && Array.isArray(result.policy_recommendation.REMOVE)) {
               result.policy_recommendation.REMOVE.forEach((action: string) => {
                 if (!removePerms.some((p) => p.action === action)) {
+                  // 고유 ID 생성: 사용자 이름 + 액션 이름 + 타임스탬프
+                  const uniqueId = `${userArn}-remove-${action}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                  
                   removePerms.push({
+                    id: uniqueId,
                     action,
                     apply: false,
                     reason: result.policy_recommendation.Reason || '',
@@ -251,7 +263,10 @@ export const usePermissionsStore = defineStore('permissions', {
         });
 
         // 사용자별 권한 맵에 저장
-        this.userPermissionsMap.set(userArn, { add: addPerms, remove: removePerms });
+        this.userPermissionsMap.set(userArn, { 
+          add: addPerms, 
+          remove: removePerms 
+        });
       });
     },
 
@@ -339,6 +354,55 @@ export const usePermissionsStore = defineStore('permissions', {
         } else {
           this.error = "적용할 권한 변경사항이 없습니다. 변경할 권한을 선택해주세요.";
         }
+      } catch (err: any) {
+        console.error('권한 변경 적용 오류:', err);
+        this.error = err.message || '정책 변경 적용 중 오류가 발생했습니다.';
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    // 한 사용자의 변경사항만 적용
+    async applyPolicyChangesForUser(userArn: string) {
+      if (!userArn) return;
+
+      this.submitting = true;
+      this.error = '';
+      this.successMessage = '';
+
+      try {
+        const userPermissions = this.userPermissionsMap.get(userArn);
+        
+        if (!userPermissions) {
+          this.error = "해당 사용자의 권한 정보를 찾을 수 없습니다.";
+          return;
+        }
+        
+        // 선택된 권한들만 필터링
+        const addSelected = userPermissions.add.filter((p) => p.apply);
+        const removeSelected = userPermissions.remove.filter((p) => p.apply);
+        
+        // 적용할 권한이 있는 경우에만 업데이트 목록에 추가
+        if (addSelected.length === 0 && removeSelected.length === 0) {
+          this.error = "적용할 권한 변경사항이 없습니다. 변경할 권한을 선택해주세요.";
+          return;
+        }
+
+        // 해당 사용자의 변경사항만 포함하는 업데이트 객체 생성
+        const policyUpdates: PolicyUpdates = {
+          user_arn: userArn,
+          add_permissions: addSelected,
+          remove_permissions: removeSelected,
+        };
+
+        // 백엔드로 변경사항 전송
+        const result = await policyService.applyPolicyChanges([policyUpdates]);
+
+        this.successMessage = `사용자 "${userArn}"의 권한 변경사항이 성공적으로 적용되었습니다.`;
+        
+        // 성공 후 해당 사용자의 체크박스 초기화
+        userPermissions.add.forEach((p) => (p.apply = false));
+        userPermissions.remove.forEach((p) => (p.apply = false));
       } catch (err: any) {
         console.error('권한 변경 적용 오류:', err);
         this.error = err.message || '정책 변경 적용 중 오류가 발생했습니다.';

@@ -86,7 +86,7 @@
 
             <!-- 정책 변경사항 적용 탭 -->
             <div v-else-if="activeTab === 'policy-changes'" class="tab-content">
-                <div class="apply-changes-container">
+                <div class="policy-changes-container">
                     <h3 class="section-title">정책 변경사항 적용</h3>
 
                     <div v-if="store.loading" class="loading-spinner">
@@ -106,135 +106,112 @@
                         </div>
 
                         <div v-else>
-                            <!-- 개선된 사용자별 권한 관리 UI -->
-                            <div class="user-permissions-manager">
-                                <div class="user-selector">
-                                    <h3>사용자 선택</h3>
-                                    <div class="selection-controls">
-                                        <button @click="selectAllUsers" class="select-all-button">
-                                            {{ store.isAllSelected ? '전체 해제' : '전체 선택' }}
-                                        </button>
-                                    </div>
-                                    <div class="user-list">
-                                        <div v-for="arn in store.userArns" :key="arn" class="user-item">
-                                            <input 
-                                                type="checkbox" 
-                                                :id="`select-user-${arn}`" 
-                                                :value="arn" 
-                                                v-model="selectedUserArns"
-                                                @change="handleUserSelectionChange"
-                                            />
-                                            <label :for="`select-user-${arn}`">{{ formatUserName(arn) }}</label>
-                                        </div>
-                                    </div>
+                            <!-- 사용자 리스트 및 탭 형태 UI -->
+                            <div class="users-tabs-container">
+                                <div class="users-tabs">
+                                    <button 
+                                        v-for="arn in store.userArns" 
+                                        :key="arn"
+                                        class="user-tab"
+                                        :class="{ active: activeUserTab === arn }"
+                                        @click="selectUser(arn)"
+                                    >
+                                        {{ formatUserName(arn) }}
+                                    </button>
                                 </div>
-
-                                <div v-if="selectedUserArns.length > 0" class="permissions-panel">
-                                    <div class="changes-info">
-                                        <p>{{ selectedUserArns.length }}명의 사용자에게 권한 변경사항이 적용됩니다.</p>
-                                    </div>
-
-                                    <div v-if="selectedUserArns.length === 1" class="single-user-view">
-                                        <h3>{{ formatUserName(selectedUserArns[0]) }}의 권한 관리</h3>
-                                        
-                                        <div class="permissions-grid">
-                                            <div class="add-permissions">
-                                                <h4>추가할 권한</h4>
-                                                <div v-if="getUserPermissions(selectedUserArns[0]).add.length > 0" class="permission-list">
-                                                    <div
-                                                        v-for="(perm, index) in getUserPermissions(selectedUserArns[0]).add"
-                                                        :key="index"
-                                                        class="permission-item"
-                                                    >
-                                                        <input type="checkbox" :id="`single-add-${index}`" v-model="perm.apply" />
-                                                        <label :for="`single-add-${index}`">{{ perm.action }}</label>
-                                                        <div class="permission-reason" v-if="perm.reason">{{ perm.reason }}</div>
-                                                    </div>
-                                                </div>
-                                                <p v-else class="empty-message">추가할 권한이 없습니다.</p>
-                                            </div>
-
-                                            <div class="remove-permissions">
-                                                <h4>제거할 권한</h4>
-                                                <div v-if="getUserPermissions(selectedUserArns[0]).remove.length > 0" class="permission-list">
-                                                    <div
-                                                        v-for="(perm, index) in getUserPermissions(selectedUserArns[0]).remove"
-                                                        :key="index"
-                                                        class="permission-item"
-                                                    >
-                                                        <input type="checkbox" :id="`single-remove-${index}`" v-model="perm.apply" />
-                                                        <label :for="`single-remove-${index}`">{{ perm.action }}</label>
-                                                        <div class="permission-reason" v-if="perm.reason">{{ perm.reason }}</div>
-                                                    </div>
-                                                </div>
-                                                <p v-else class="empty-message">제거할 권한이 없습니다.</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div v-else class="multi-user-view">
-                                        <h3>{{ selectedUserArns.length }}명의 사용자 권한 관리</h3>
-                                        
-                                        <div class="user-tabs">
+                                
+                                <!-- 현재 선택된 사용자의 권한 정보 -->
+                                <div v-if="activeUserTab" class="user-permissions">
+                                    <div class="user-header">
+                                        <h3>{{ formatUserName(activeUserTab) }}의 권한 관리</h3>
+                                        <div class="user-actions">
                                             <button 
-                                                v-for="arn in selectedUserArns" 
-                                                :key="arn"
-                                                class="user-tab"
-                                                :class="{ active: activeUserTab === arn }"
-                                                @click="activeUserTab = arn"
+                                                @click="applyChangesForUser(activeUserTab)" 
+                                                class="apply-user-button"
+                                                :disabled="!hasChangesForUser(activeUserTab) || store.submitting"
                                             >
-                                                {{ formatUserName(arn) }}
+                                                {{ store.submitting ? '적용 중...' : '이 사용자의 변경사항 적용' }}
                                             </button>
                                         </div>
-
-                                        <div v-if="activeUserTab" class="permissions-grid">
-                                            <div class="add-permissions">
-                                                <h4>추가할 권한</h4>
-                                                <div v-if="getUserPermissions(activeUserTab).add.length > 0" class="permission-list">
-                                                    <div
-                                                        v-for="(perm, index) in getUserPermissions(activeUserTab).add"
-                                                        :key="index"
-                                                        class="permission-item"
-                                                    >
-                                                        <input type="checkbox" :id="`multi-add-${activeUserTab}-${index}`" v-model="perm.apply" />
-                                                        <label :for="`multi-add-${activeUserTab}-${index}`">{{ perm.action }}</label>
-                                                        <div class="permission-reason" v-if="perm.reason">{{ perm.reason }}</div>
-                                                    </div>
+                                    </div>
+                                    
+                                    <div class="permissions-grid">
+                                        <div class="add-permissions">
+                                            <h4>추가할 권한</h4>
+                                            <div v-if="getUserPermissions(activeUserTab).add.length > 0" class="permission-list">
+                                                <div
+                                                    v-for="(perm, index) in getUserPermissions(activeUserTab).add"
+                                                    :key="perm.id || index"
+                                                    class="permission-item"
+                                                >
+                                                    <input 
+                                                        type="checkbox" 
+                                                        :id="`add-${activeUserTab}-${index}`" 
+                                                        v-model="perm.apply" 
+                                                        @change="(e) => handleCheckboxChange(e, perm, 'add', activeUserTab)"
+                                                    />
+                                                    <label :for="`add-${activeUserTab}-${index}`">{{ perm.action }}</label>
+                                                    <div class="permission-reason" v-if="perm.reason">{{ perm.reason }}</div>
                                                 </div>
-                                                <p v-else class="empty-message">추가할 권한이 없습니다.</p>
                                             </div>
+                                            <p v-else class="empty-message">추가할 권한이 없습니다.</p>
+                                        </div>
 
-                                            <div class="remove-permissions">
-                                                <h4>제거할 권한</h4>
-                                                <div v-if="getUserPermissions(activeUserTab).remove.length > 0" class="permission-list">
-                                                    <div
-                                                        v-for="(perm, index) in getUserPermissions(activeUserTab).remove"
-                                                        :key="index"
-                                                        class="permission-item"
-                                                    >
-                                                        <input type="checkbox" :id="`multi-remove-${activeUserTab}-${index}`" v-model="perm.apply" />
-                                                        <label :for="`multi-remove-${activeUserTab}-${index}`">{{ perm.action }}</label>
-                                                        <div class="permission-reason" v-if="perm.reason">{{ perm.reason }}</div>
-                                                    </div>
+                                        <div class="remove-permissions">
+                                            <h4>제거할 권한</h4>
+                                            <div v-if="getUserPermissions(activeUserTab).remove.length > 0" class="permission-list">
+                                                <div
+                                                    v-for="(perm, index) in getUserPermissions(activeUserTab).remove"
+                                                    :key="perm.id || index"
+                                                    class="permission-item"
+                                                >
+                                                    <input 
+                                                        type="checkbox" 
+                                                        :id="`remove-${activeUserTab}-${index}`" 
+                                                        v-model="perm.apply" 
+                                                        @change="(e) => handleCheckboxChange(e, perm, 'remove', activeUserTab)"
+                                                    />
+                                                    <label :for="`remove-${activeUserTab}-${index}`">{{ perm.action }}</label>
+                                                    <div class="permission-reason" v-if="perm.reason">{{ perm.reason }}</div>
                                                 </div>
-                                                <p v-else class="empty-message">제거할 권한이 없습니다.</p>
                                             </div>
+                                            <p v-else class="empty-message">제거할 권한이 없습니다.</p>
                                         </div>
                                     </div>
-
-                                    <div class="action-bar">
-                                        <button 
-                                            @click="applyChanges" 
-                                            class="apply-button"
-                                            :disabled="!hasChangesToApply || store.submitting"
-                                        >
-                                            {{ store.submitting ? '적용 중...' : '변경사항 적용' }}
-                                        </button>
-                                    </div>
                                 </div>
-
+                                
                                 <div v-else class="empty-selection">
                                     <p>권한을 관리할 사용자를 선택하세요.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 전체 변경사항 적용 버튼 -->
+                            <div class="global-action-bar">
+                                <button 
+                                    @click="applyAllChanges" 
+                                    class="apply-all-button"
+                                    :disabled="!hasAnyChanges || store.submitting"
+                                >
+                                    {{ store.submitting ? '적용 중...' : '모든 변경사항 적용' }}
+                                </button>
+                            </div>
+                            
+                            <!-- 사용자별 변경사항 요약 -->
+                            <div v-if="hasAnyChanges" class="changes-summary">
+                                <h4>변경 예정 사항 요약</h4>
+                                <div v-for="arn in store.userArns" :key="`summary-${arn}`" class="user-changes">
+                                    <div v-if="hasChangesForUser(arn)" class="user-change-item">
+                                        <strong>{{ formatUserName(arn) }}</strong>: 
+                                        <span v-if="countChangesForUser(arn).addCount > 0" class="add-count">
+                                            {{ countChangesForUser(arn).addCount }}개 권한 추가
+                                        </span>
+                                        <span v-if="countChangesForUser(arn).addCount > 0 && countChangesForUser(arn).removeCount > 0">
+                                            , 
+                                        </span>
+                                        <span v-if="countChangesForUser(arn).removeCount > 0" class="remove-count">
+                                            {{ countChangesForUser(arn).removeCount }}개 권한 제거
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -254,11 +231,11 @@
 </template>
 
 <script lang="ts">
-    import { defineComponent, onMounted, ref, watch, computed } from 'vue';
+    import { defineComponent, onMounted, ref, watch, computed, reactive, nextTick } from 'vue';
     import { useRouter, useRoute } from 'vue-router';
     import AppLayout from '@/layouts/AppLayout.vue';
     import { usePermissionsStore } from '@/stores/permissions';
-    import { PermissionChange } from '@/services/policyService';
+    import type { PermissionChange } from '@/services/policyService';
 
     export default defineComponent({
         name: 'PermissionsPage',
@@ -271,8 +248,10 @@
             const router = useRouter();
             const route = useRoute();
             const activeTab = ref('general');
-            const selectedUserArns = ref<string[]>([]);
-            const activeUserTab = ref<string>('');
+            const activeUserTab = ref(''); // 현재 선택된 사용자
+            
+            // 사용자별 권한 정보를 저장할 reactive 맵 추가
+            const userPermissionsReactive = reactive(new Map());
 
             // URL 쿼리 파라미터 처리
             try {
@@ -295,14 +274,6 @@
                     if (activeTab.value === 'policy-changes' && store.analysisResults.length === 0) {
                         fetchAnalysisResults();
                     }
-
-                    // 스토어에 선택된 사용자들이 있으면 선택
-                    if (store.selectedUserArns.length > 0) {
-                        selectedUserArns.value = [...store.selectedUserArns];
-                        if (selectedUserArns.value.length > 0) {
-                            activeUserTab.value = selectedUserArns.value[0];
-                        }
-                    }
                 } catch (err) {
                     console.error('컴포넌트 마운트 오류:', err);
                 }
@@ -320,12 +291,6 @@
                 }
             });
 
-            // selectedUserArns 감시 설정 수정
-            watch(selectedUserArns, (newValue) => {
-                store.selectUserArns([...newValue]);
-                updateActiveUserTab();
-            });
-
             // 권한 데이터 가져오기
             const fetchPermissions = () => {
                 try {
@@ -339,10 +304,9 @@
             const fetchAnalysisResults = async () => {
                 try {
                     await store.fetchAnalysisResults();
-                    // 스토어 상태 반영
-                    selectedUserArns.value = [...store.selectedUserArns];
-                    if (selectedUserArns.value.length > 0) {
-                        activeUserTab.value = selectedUserArns.value[0];
+                    // 첫 번째 사용자를 기본 선택
+                    if (store.userArns.length > 0) {
+                        activeUserTab.value = store.userArns[0];
                     }
                 } catch (err) {
                     console.error('분석 결과 가져오기 오류:', err);
@@ -371,76 +335,103 @@
                 }
             };
 
-            // 전체 사용자 선택/해제
-            const selectAllUsers = () => {
-                if (store.isAllSelected) {
-                    selectedUserArns.value = [];
-                } else {
-                    selectedUserArns.value = [...store.userArns];
-                }
-                handleUserSelectionChange();
-            };
-
-            // 사용자 선택 변경 처리
-            const handleUserSelectionChange = () => {
-                try {
-                    // 스토어에 선택된 사용자 목록 업데이트
-                    store.selectUserArns([...selectedUserArns.value]);
-                    
-                    // 선택된 사용자가 변경되면 활성 탭도 업데이트
-                    updateActiveUserTab();
-                } catch (err) {
-                    console.error('사용자 선택 오류:', err);
-                }
-            };
-
-            // 활성 사용자 탭 업데이트
-            const updateActiveUserTab = () => {
-                // 선택된 사용자가 있고 현재 activeUserTab이 선택된 사용자 목록에 없거나 없는 경우 업데이트
-                if (selectedUserArns.value.length > 0) {
-                    if (!selectedUserArns.value.includes(activeUserTab.value)) {
-                        activeUserTab.value = selectedUserArns.value[0];
-                    }
-                } else {
-                    activeUserTab.value = '';
-                }
+            // 사용자 선택
+            const selectUser = (userArn: string) => {
+                activeUserTab.value = userArn;
             };
 
             // 특정 사용자의 권한 정보 가져오기 함수 수정
             const getUserPermissions = (userArn: string) => {
                 if (!userArn) return { add: [], remove: [] };
                 
-                // userPermissionsMap에서 해당 사용자의 권한 정보만 정확하게 가져옴
+                // 이미 저장된 reactive 객체가 있으면 반환
+                if (userPermissionsReactive.has(userArn)) {
+                    return userPermissionsReactive.get(userArn);
+                }
+                
+                // userPermissionsMap에서 해당 사용자의 권한 정보만 가져옴
                 const userPerms = store.userPermissionsMap.get(userArn);
                 
                 // 해당 사용자의 권한 정보가 없으면 빈 객체 반환
                 if (!userPerms) {
-                    return { add: [], remove: [] };
+                    const emptyPerms = { add: [], remove: [] };
+                    userPermissionsReactive.set(userArn, emptyPerms);
+                    return emptyPerms;
                 }
                 
-                // 사용자의 권한 정보를 깊은 복사하여 반환
-                // 다른 사용자의 권한과 섞이지 않도록 함
-                return {
-                    add: userPerms.add.map(perm => ({...perm})),
-                    remove: userPerms.remove.map(perm => ({...perm}))
+                // 사용자의 권한 정보를 reactive 객체로 변환
+                const reactivePerms = {
+                    add: userPerms.add.map(perm => ({
+                        ...perm,
+                        // 고유 ID가 없는 경우 생성 (추가적인 독립성 보장)
+                        id: perm.id || `${userArn}-add-${perm.action}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                    })),
+                    remove: userPerms.remove.map(perm => ({
+                        ...perm,
+                        // 고유 ID가 없는 경우 생성 (추가적인 독립성 보장)
+                        id: perm.id || `${userArn}-remove-${perm.action}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                    }))
                 };
+                
+                // 변환된 객체를 reactive 맵에 저장
+                userPermissionsReactive.set(userArn, reactivePerms);
+                
+                return reactivePerms;
             };
 
-            // 적용할 변경사항이 있는지 확인
-            const hasChangesToApply = computed(() => {
-                for (const userArn of selectedUserArns.value) {
-                    const userPerms = getUserPermissions(userArn);
-                    if (userPerms.add.some(p => p.apply) || userPerms.remove.some(p => p.apply)) {
-                        return true;
-                    }
-                }
-                return false;
+            // 체크박스 변경 감지 함수 수정
+            const handleCheckboxChange = (event: Event, permission: any, type: 'add' | 'remove', userArn: string) => {
+                console.log(`체크박스 변경: ${userArn}, ${type}, ${permission.action}, 상태: ${permission.apply}`);
+                
+                // 해당 사용자의 모든 권한 상태 업데이트를 위해 특별한 처리는 필요 없음
+                // reactive 객체가 직접 업데이트됨
+                
+                // hasChangesForUser와 hasAnyChanges가 정확히 계산되도록 상태 업데이트 트리거
+                nextTick(() => {
+                    // 강제 리렌더링은 필요 없음
+                });
+            };
+
+            // 특정 사용자에 대해 변경사항이 있는지 확인 - 수정
+            const hasChangesForUser = (userArn: string) => {
+                const userPerms = getUserPermissions(userArn);
+                return userPerms.add.some(p => p.apply) || userPerms.remove.some(p => p.apply);
+            };
+
+            // 특정 사용자의 변경사항 개수 세기
+            const countChangesForUser = (userArn: string) => {
+                const userPerms = getUserPermissions(userArn);
+                const addCount = userPerms.add.filter(p => p.apply).length;
+                const removeCount = userPerms.remove.filter(p => p.apply).length;
+                return { addCount, removeCount };
+            };
+
+            // 모든 사용자에 대해 변경사항이 있는지 확인
+            const hasAnyChanges = computed(() => {
+                return store.userArns.some(arn => hasChangesForUser(arn));
             });
 
-            // 정책 변경사항 적용
-            const applyChanges = () => {
+            // 한 사용자의 변경사항만 적용
+            const applyChangesForUser = async (userArn: string) => {
+                if (!hasChangesForUser(userArn)) return;
+                
                 try {
-                    store.applyPolicyChanges();
+                    await store.applyPolicyChangesForUser(userArn);
+                    console.log(`${formatUserName(userArn)}의 변경사항 적용 완료`);
+                } catch (err) {
+                    console.error('변경사항 적용 오류:', err);
+                }
+            };
+
+            // 모든 변경사항 적용
+            const applyAllChanges = async () => {
+                try {
+                    // 변경사항이 있는 모든 사용자에 대해 적용
+                    const usersWithChanges = store.userArns.filter(arn => hasChangesForUser(arn));
+                    if (usersWithChanges.length === 0) return;
+                    
+                    await store.applyPolicyChanges();
+                    console.log('모든 변경사항 적용 완료');
                 } catch (err) {
                     console.error('변경사항 적용 오류:', err);
                 }
@@ -466,18 +457,21 @@
             return {
                 store,
                 activeTab,
-                selectedUserArns,
                 activeUserTab,
                 fetchPermissions,
                 fetchAnalysisResults,
                 selectPermission,
                 deletePermission,
-                selectAllUsers,
-                handleUserSelectionChange,
+                selectUser,
                 getUserPermissions,
-                hasChangesToApply,
-                applyChanges,
-                formatUserName
+                hasChangesForUser,
+                countChangesForUser,
+                hasAnyChanges,
+                handleCheckboxChange,
+                applyChangesForUser,
+                applyAllChanges,
+                formatUserName,
+                userPermissionsReactive
             };
         },
     });
@@ -657,7 +651,7 @@
     }
 
     /* 정책 변경 탭 스타일 */
-    .apply-changes-container {
+    .policy-changes-container {
         background-color: white;
         border-radius: 8px;
         padding: 20px;
@@ -688,120 +682,153 @@
         border-radius: 4px;
         cursor: pointer;
     }
-
-    /* 개선된 사용자 권한 관리 UI 스타일 */
-    .user-permissions-manager {
+    
+    /* 새로운 사용자별 권한 관리 스타일 */
+    .users-tabs-container {
         margin-top: 20px;
         border: 1px solid #e9ecef;
         border-radius: 8px;
         overflow: hidden;
     }
 
-    .user-selector {
-        padding: 15px;
-        border-bottom: 1px solid #e9ecef;
-        background-color: #f8f9fa;
-        position: relative;
-    }
-
-    .user-selector h3 {
-        margin-top: 0;
-        margin-bottom: 10px;
-    }
-
-    .selection-controls {
-        position: absolute;
-        right: 15px;
-        top: 15px;
-    }
-
-    .select-all-button {
-        padding: 4px 8px;
-        font-size: 0.9rem;
-        background-color: #f8f9fa;
-        border: 1px solid #ced4da;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-
-    .select-all-button:hover {
-        background-color: #e9ecef;
-    }
-
-    .user-list {
-        max-height: 200px;
-        overflow-y: auto;
-        border: 1px solid #ced4da;
-        border-radius: 4px;
-        padding: 5px;
-    }
-
-    .user-item {
-        padding: 5px 10px;
-        display: flex;
-        align-items: center;
-        border-bottom: 1px solid #f1f1f1;
-    }
-
-    .user-item:last-child {
-        border-bottom: none;
-    }
-
-    .user-item label {
-        margin-left: 8px;
-        cursor: pointer;
-    }
-
-    .permissions-panel {
-        padding: 15px;
-    }
-
-    .changes-info {
-        background-color: #e8f4fd;
-        padding: 10px 15px;
-        border-radius: 4px;
-        margin-bottom: 15px;
-        color: #0066cc;
-        font-weight: bold;
-    }
-
-    .single-user-view, .multi-user-view {
-        margin-bottom: 20px;
-    }
-
-    .user-tabs {
+    .users-tabs {
         display: flex;
         overflow-x: auto;
-        gap: 10px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid #dee2e6;
-        margin-bottom: 15px;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        padding: 10px;
+        gap: 8px;
     }
 
     .user-tab {
         padding: 8px 15px;
-        background: #e9ecef;
+        background-color: #e9ecef;
         border: none;
         border-radius: 4px;
         cursor: pointer;
+        transition: all 0.2s;
         white-space: nowrap;
+        color: #495057;
+        font-size: 0.9rem;
+    }
+
+    .user-tab:hover {
+        background-color: #dee2e6;
     }
 
     .user-tab.active {
-        background: #007bff;
+        background-color: #007bff;
         color: white;
     }
 
-    .permissions-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
+    .user-permissions {
+        padding: 20px;
     }
 
-    @media (max-width: 768px) {
-        .permissions-grid {
-            grid-template-columns: 1fr;
-        }
+    .user-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .user-header h3 {
+        margin: 0;
+        color: #333;
+    }
+
+    .user-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .apply-user-button {
+        padding: 8px 15px;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: background-color 0.2s;
+    }
+
+    .apply-user-button:hover:not(:disabled) {
+        background-color: #218838;
+    }
+
+    .apply-user-button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+    }
+
+    .global-action-bar {
+        margin-top: 20px;
+        display: flex;
+        justify-content: center;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .apply-all-button {
+        padding: 10px 25px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background-color 0.2s;
+    }
+
+    .apply-all-button:hover:not(:disabled) {
+        background-color: #0069d9;
+    }
+
+    .apply-all-button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+    }
+
+    .changes-summary {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+    }
+
+    .changes-summary h4 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        color: #333;
+    }
+
+    .user-changes {
+        margin-bottom: 8px;
+    }
+
+    .user-change-item {
+        padding: 8px;
+        background-color: #fff;
+        border-radius: 4px;
+        border: 1px solid #e9ecef;
+    }
+
+    .add-count {
+        color: #28a745;
+    }
+
+    .remove-count {
+        color: #dc3545;
+    }
+
+    .empty-selection {
+        padding: 30px;
+        text-align: center;
+        color: #6c757d;
     }
 
     .add-permissions, .remove-permissions {
@@ -853,38 +880,6 @@
     .empty-message {
         color: #6c757d;
         font-style: italic;
-    }
-
-    .action-bar {
-        margin-top: 20px;
-        display: flex;
-        justify-content: flex-end;
-    }
-
-    .apply-button {
-        padding: 10px 20px;
-        background-color: #28a745;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-
-    .apply-button:hover:not(:disabled) {
-        background-color: #218838;
-    }
-
-    .apply-button:disabled {
-        background-color: #cccccc;
-        cursor: not-allowed;
-    }
-
-    .empty-selection {
-        text-align: center;
-        padding: 30px;
-        color: #6c757d;
     }
 
     .success-message {
