@@ -356,17 +356,23 @@
         border-radius: 3px;
         font-family: monospace;
         font-size: 0.9em;
+        word-break: break-word; /* 긴 단어가 있을 경우 줄바꿈 */
+        overflow-wrap: break-word; /* 단어가 너무 길 경우 줄바꿈 */
     }
 
     [v-markdown] pre {
         background-color: #f8f9fa;
         padding: 1rem;
         border-radius: 4px;
-        overflow-x: auto;
+        overflow-x: auto; /* 이미 있지만 중요한 속성 */
+        max-width: 100%; /* 최대 너비를 부모 요소에 맞춤 */
+        word-wrap: break-word; /* 긴 단어가 있을 경우 줄바꿈 */
+        white-space: pre-wrap; /* 줄바꿈 유지하면서 너비 조절 */
     }
 
     [v-markdown] pre code {
         background-color: transparent;
+        white-space: pre-wrap; /* pre 안의 code는 줄바꿈 유지하면서 너비 조절 */
         padding: 0;
     }
 
