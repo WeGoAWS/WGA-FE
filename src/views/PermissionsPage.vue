@@ -107,19 +107,44 @@
 
                         <div v-else>
                             <div class="user-selection" v-if="store.userArns.length > 0">
-                                <label for="user-select">사용자 ARN 선택:</label>
-                                <select id="user-select" v-model="selectedUserArn" class="select-input" @change="handleUserSelect">
-                                    <option value="">사용자 선택...</option>
-                                    <option v-for="arn in store.userArns" :key="arn" :value="arn">{{ formatUserName(arn) }}</option>
-                                </select>
+                                <!-- 다중 선택 기능을 위한 체크박스 그룹 -->
+                                <div class="selection-header">
+                                    <h4>사용자 ARN 선택:</h4>
+                                    <div class="selection-controls">
+                                        <button @click="store.selectAllUsers()" class="select-all-button">
+                                            {{ store.isAllSelected ? '전체 해제' : '전체 선택' }}
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="users-container">
+                                    <div 
+                                        v-for="arn in store.userArns" 
+                                        :key="arn" 
+                                        class="user-checkbox-item"
+                                    >
+                                        <input 
+                                            type="checkbox" 
+                                            :id="`user-${arn}`" 
+                                            :value="arn" 
+                                            v-model="selectedUserArns"
+                                            @change="handleUserSelectionChange"
+                                        />
+                                        <label :for="`user-${arn}`" class="user-arn-label">{{ formatUserName(arn) }}</label>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div v-if="selectedUserArn" class="changes-section">
+                            <div v-if="selectedUserArns.length > 0" class="changes-info">
+                                <p>{{ selectedUserArns.length }}명의 사용자에게 권한 변경사항이 적용됩니다.</p>
+                            </div>
+
+                            <div v-if="selectedUserArns.length > 0" class="changes-section">
                                 <div class="add-permissions">
                                     <h4>추가할 권한</h4>
-                                    <div v-if="store.addPermissions.length > 0" class="permission-list">
+                                    <div v-if="store.combinedAddPermissions.length > 0" class="permission-list">
                                         <div
-                                            v-for="(perm, index) in store.addPermissions"
+                                            v-for="(perm, index) in store.combinedAddPermissions"
                                             :key="index"
                                             class="permission-item"
                                         >
@@ -132,9 +157,9 @@
 
                                 <div class="remove-permissions">
                                     <h4>제거할 권한</h4>
-                                    <div v-if="store.removePermissions.length > 0" class="permission-list">
+                                    <div v-if="store.combinedRemovePermissions.length > 0" class="permission-list">
                                         <div
-                                            v-for="(perm, index) in store.removePermissions"
+                                            v-for="(perm, index) in store.combinedRemovePermissions"
                                             :key="index"
                                             class="permission-item"
                                         >
@@ -155,7 +180,7 @@
                             </div>
 
                             <div v-else-if="store.userArns.length > 0" class="instruction">
-                                사용자를 선택하여 권한 변경사항을 적용하세요.
+                                적용할 사용자를 선택하세요.
                             </div>
 
                             <div v-else class="empty-message">사용자 ARN 목록을 가져올 수 없습니다.</div>
@@ -192,7 +217,7 @@
             const router = useRouter();
             const route = useRoute();
             const activeTab = ref('general');
-            const selectedUserArn = ref('');
+            const selectedUserArns = ref<string[]>([]);
 
             // URL 쿼리 파라미터 처리
             try {
@@ -216,9 +241,9 @@
                         fetchAnalysisResults();
                     }
 
-                    // 스토어에 선택된 사용자가 있으면 선택
-                    if (store.selectedUserArn) {
-                        selectedUserArn.value = store.selectedUserArn;
+                    // 스토어에 선택된 사용자들이 있으면 선택
+                    if (store.selectedUserArns.length > 0) {
+                        selectedUserArns.value = [...store.selectedUserArns];
                     }
                 } catch (err) {
                     console.error('컴포넌트 마운트 오류:', err);
@@ -237,6 +262,11 @@
                 }
             });
 
+            // selectedUserArns가 변경될 때 store 업데이트
+            watch(selectedUserArns, (newValue) => {
+                store.selectUserArns([...newValue]);
+            });
+
             // 권한 데이터 가져오기
             const fetchPermissions = () => {
                 try {
@@ -250,9 +280,8 @@
             const fetchAnalysisResults = async () => {
                 try {
                     await store.fetchAnalysisResults();
-                    if (store.selectedUserArn) {
-                        selectedUserArn.value = store.selectedUserArn;
-                    }
+                    // 스토어 상태 반영
+                    selectedUserArns.value = [...store.selectedUserArns];
                 } catch (err) {
                     console.error('분석 결과 가져오기 오류:', err);
                 }
@@ -280,12 +309,10 @@
                 }
             };
 
-            // 사용자 선택 처리
-            const handleUserSelect = () => {
+            // 사용자 선택 변경 처리
+            const handleUserSelectionChange = () => {
                 try {
-                    if (selectedUserArn.value) {
-                        store.selectUserArn(selectedUserArn.value);
-                    }
+                    store.selectUserArns([...selectedUserArns.value]);
                 } catch (err) {
                     console.error('사용자 선택 오류:', err);
                 }
@@ -320,12 +347,12 @@
             return {
                 store,
                 activeTab,
-                selectedUserArn,
+                selectedUserArns,
                 fetchPermissions,
                 fetchAnalysisResults,
                 selectPermission,
                 deletePermission,
-                handleUserSelect,
+                handleUserSelectionChange,
                 applyChanges,
                 formatUserName
             };
@@ -539,18 +566,67 @@
         cursor: pointer;
     }
 
-    .user-selection {
-        margin-bottom: 20px;
+    .selection-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
     }
 
-    .select-input {
-        display: block;
-        width: 100%;
-        padding: 8px 12px;
+    .selection-header h4 {
+        margin: 0;
+    }
+
+    .selection-controls {
+        display: flex;
+        gap: 10px;
+    }
+
+    .select-all-button {
+        padding: 4px 8px;
+        font-size: 0.9rem;
+        background-color: #f8f9fa;
         border: 1px solid #ced4da;
         border-radius: 4px;
-        margin-top: 5px;
-        font-size: 1rem;
+        cursor: pointer;
+    }
+
+    .select-all-button:hover {
+        background-color: #e9ecef;
+    }
+
+    .users-container {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 5px;
+        margin-bottom: 15px;
+    }
+
+    .user-checkbox-item {
+        padding: 5px 10px;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #f1f1f1;
+    }
+
+    .user-checkbox-item:last-child {
+        border-bottom: none;
+    }
+
+    .user-arn-label {
+        margin-left: 8px;
+        cursor: pointer;
+    }
+
+    .changes-info {
+        background-color: #e8f4fd;
+        padding: 10px 15px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+        color: #0066cc;
+        font-weight: bold;
     }
 
     .changes-section {

@@ -1,7 +1,7 @@
 // src/stores/permissions.ts
 import { defineStore } from 'pinia';
 import policyService from '@/services/policyService';
-import type { PermissionChange, PolicyRecommendation, AnalysisResult } from '@/services/policyService';
+import type { PermissionChange, PolicyRecommendation, AnalysisResult, PolicyUpdates } from '@/services/policyService';
 
 interface PermissionsState {
   loading: boolean;
@@ -10,9 +10,13 @@ interface PermissionsState {
   selectedPermission: any | null;
   analysisResults: AnalysisResult[];
   userArns: string[];
-  selectedUserArn: string;
-  addPermissions: PermissionChange[];
-  removePermissions: PermissionChange[];
+  selectedUserArns: string[]; // 다중 선택을 위한 배열
+  userPermissionsMap: Map<string, {
+    add: PermissionChange[];
+    remove: PermissionChange[];
+  }>;
+  combinedAddPermissions: PermissionChange[];
+  combinedRemovePermissions: PermissionChange[];
   submitting: boolean;
   successMessage: string;
 }
@@ -25,9 +29,10 @@ export const usePermissionsStore = defineStore('permissions', {
     selectedPermission: null,
     analysisResults: [],
     userArns: [],
-    selectedUserArn: '',
-    addPermissions: [],
-    removePermissions: [],
+    selectedUserArns: [],
+    userPermissionsMap: new Map(),
+    combinedAddPermissions: [],
+    combinedRemovePermissions: [],
     submitting: false,
     successMessage: '',
   }),
@@ -38,9 +43,14 @@ export const usePermissionsStore = defineStore('permissions', {
     // 적용할 변경사항이 있는지 확인
     hasChangesToApply: (state) => {
       return (
-        state.addPermissions.some((p) => p.apply) ||
-        state.removePermissions.some((p) => p.apply)
+        state.combinedAddPermissions.some((p) => p.apply) ||
+        state.combinedRemovePermissions.some((p) => p.apply)
       );
+    },
+    
+    // 전체 선택 여부
+    isAllSelected: (state) => {
+      return state.selectedUserArns.length === state.userArns.length && state.userArns.length > 0;
     },
   },
 
@@ -106,6 +116,9 @@ export const usePermissionsStore = defineStore('permissions', {
         
         // 사용자 ARN 목록 생성
         this.extractUserArns();
+        
+        // 모든 사용자의 권한 정보 추출
+        this.extractAllUserPermissions();
       } catch (err: any) {
         console.error('분석 결과 가져오기 오류:', err);
         this.error = err.message || '분석 결과를 불러오는 중 오류가 발생했습니다.';
@@ -133,24 +146,42 @@ export const usePermissionsStore = defineStore('permissions', {
       }
     },
 
-    // 사용자 ARN 선택
-    selectUserArn(userArn: string) {
-      if (!userArn) return;
-      
-      this.selectedUserArn = userArn;
-      this.extractPermissionsFromResults(userArn);
+    // 전체 사용자 선택/해제
+    selectAllUsers() {
+      if (this.isAllSelected) {
+        // 전체 해제
+        this.selectedUserArns = [];
+      } else {
+        // 전체 선택
+        this.selectedUserArns = [...this.userArns];
+      }
+      this.updateCombinedPermissions();
     },
 
-    // 분석 결과에서 권한 추출
-    extractPermissionsFromResults(userArn: string) {
-      if (!userArn) {
-        this.addPermissions = [];
-        this.removePermissions = [];
-        return;
+    // 사용자 ARN 선택 (다중 선택 지원)
+    selectUserArns(userArns: string[]) {
+      this.selectedUserArns = userArns;
+      this.updateCombinedPermissions();
+    },
+
+    // 단일 사용자 ARN 토글
+    toggleUserArn(userArn: string) {
+      const index = this.selectedUserArns.indexOf(userArn);
+      if (index >= 0) {
+        this.selectedUserArns.splice(index, 1);
+      } else {
+        this.selectedUserArns.push(userArn);
       }
+      this.updateCombinedPermissions();
+    },
+
+    // 모든 사용자의 권한 정보 추출
+    extractAllUserPermissions() {
+      // 사용자별 권한 맵 초기화
+      this.userPermissionsMap.clear();
       
-      try {
-        // 선택된 사용자와 관련된 결과만 필터링
+      // 각 사용자에 대한 권한 추출
+      this.userArns.forEach(userArn => {
         const userResults = this.analysisResults.filter(
           (result: AnalysisResult) => {
             if (!result || !result.user) return false;
@@ -159,8 +190,7 @@ export const usePermissionsStore = defineStore('permissions', {
         );
 
         if (userResults.length === 0) {
-          this.addPermissions = [];
-          this.removePermissions = [];
+          this.userPermissionsMap.set(userArn, { add: [], remove: [] });
           return;
         }
 
@@ -199,18 +229,49 @@ export const usePermissionsStore = defineStore('permissions', {
           }
         });
 
-        this.addPermissions = addPerms;
-        this.removePermissions = removePerms;
-      } catch (err) {
-        console.error('권한 추출 오류:', err);
-        this.addPermissions = [];
-        this.removePermissions = [];
-      }
+        // 사용자별 권한 맵에 저장
+        this.userPermissionsMap.set(userArn, { add: addPerms, remove: removePerms });
+      });
     },
 
-    // 정책 변경사항 적용
+    // 선택된 사용자들의 권한 조합 업데이트
+    updateCombinedPermissions() {
+      if (this.selectedUserArns.length === 0) {
+        this.combinedAddPermissions = [];
+        this.combinedRemovePermissions = [];
+        return;
+      }
+      
+      // 선택된 사용자들의 권한을 조합
+      const addPermsMap = new Map<string, PermissionChange>();
+      const removePermsMap = new Map<string, PermissionChange>();
+      
+      this.selectedUserArns.forEach(arn => {
+        const userPerms = this.userPermissionsMap.get(arn);
+        if (userPerms) {
+          // 추가 권한 처리
+          userPerms.add.forEach(perm => {
+            if (!addPermsMap.has(perm.action)) {
+              addPermsMap.set(perm.action, { ...perm, apply: false });
+            }
+          });
+          
+          // 제거 권한 처리
+          userPerms.remove.forEach(perm => {
+            if (!removePermsMap.has(perm.action)) {
+              removePermsMap.set(perm.action, { ...perm, apply: false });
+            }
+          });
+        }
+      });
+      
+      this.combinedAddPermissions = Array.from(addPermsMap.values());
+      this.combinedRemovePermissions = Array.from(removePermsMap.values());
+    },
+
+    // 정책 변경사항 적용 (다중 사용자 지원)
     async applyPolicyChanges() {
-      if (!this.selectedUserArn || !this.hasChangesToApply) return;
+      if (this.selectedUserArns.length === 0 || !this.hasChangesToApply) return;
 
       this.submitting = true;
       this.error = '';
@@ -218,24 +279,24 @@ export const usePermissionsStore = defineStore('permissions', {
 
       try {
         // 선택된 권한들만 필터링
-        const addSelected = this.addPermissions.filter((p) => p.apply);
-        const removeSelected = this.removePermissions.filter((p) => p.apply);
+        const addSelected = this.combinedAddPermissions.filter((p) => p.apply);
+        const removeSelected = this.combinedRemovePermissions.filter((p) => p.apply);
 
-        // 백엔드 API 요청 형식에 맞게 데이터 변환
-        const policyRecommendation: PolicyRecommendation = {
-          REMOVE: removeSelected.map(p => p.action),
-          ADD: addSelected.map(p => p.action),
-          Reason: "사용자에 의해 선택된 권한 변경사항"
-        };
+        // 각 사용자별 변경사항 생성
+        const policyUpdates: PolicyUpdates[] = this.selectedUserArns.map(arn => ({
+          user_arn: arn,
+          add_permissions: addSelected,
+          remove_permissions: removeSelected,
+        }));
 
-        // 백엔드로 변경사항 전송
-        const result = await policyService.applyPolicyChangesToBackend(this.selectedUserArn, policyRecommendation);
+        // 백엔드로 변경사항 전송 (다중 사용자 지원)
+        const result = await policyService.applyPolicyChanges(policyUpdates);
 
-        this.successMessage = '권한 변경사항이 성공적으로 적용되었습니다.';
+        this.successMessage = `${this.selectedUserArns.length}명의 사용자에게 권한 변경사항이 성공적으로 적용되었습니다.`;
 
         // 성공 후 체크박스 초기화
-        this.addPermissions.forEach((p) => (p.apply = false));
-        this.removePermissions.forEach((p) => (p.apply = false));
+        this.combinedAddPermissions.forEach((p) => (p.apply = false));
+        this.combinedRemovePermissions.forEach((p) => (p.apply = false));
       } catch (err: any) {
         console.error('권한 변경 적용 오류:', err);
         this.error = err.message || '권한 변경 적용 중 오류가 발생했습니다.';
@@ -252,9 +313,10 @@ export const usePermissionsStore = defineStore('permissions', {
       this.selectedPermission = null;
       this.analysisResults = [];
       this.userArns = [];
-      this.selectedUserArn = '';
-      this.addPermissions = [];
-      this.removePermissions = [];
+      this.selectedUserArns = [];
+      this.userPermissionsMap.clear();
+      this.combinedAddPermissions = [];
+      this.combinedRemovePermissions = [];
       this.submitting = false;
       this.successMessage = '';
     }
