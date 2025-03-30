@@ -16,6 +16,7 @@ export interface AnalysisResult {
     risk_classification: string;
     severity: string;
     summary: string;
+    analysis_comment: string;
     policy_recommendation: PolicyRecommendation;
 }
 
@@ -48,7 +49,9 @@ class PolicyService {
      */
     async getDemoAnalysis(): Promise<AnalysisResult[]> {
         try {
-            const response = await axios.get<AnalysisResult[]>(`${this.apiUrl}/cloudtrail/analyze-logs`);
+            const response = await axios.get<AnalysisResult[]>(
+                `${this.apiUrl}/cloudtrail/analyze-logs`,
+            );
 
             return response.data;
         } catch (error: any) {

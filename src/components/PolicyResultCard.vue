@@ -12,17 +12,27 @@
 
         <div class="card-body">
             <div class="risk-info">
-                <div :class="['risk-badge', getRiskClass(result.risk_classification)]">
+                <div
+                    v-if="result.risk_classification"
+                    :class="['risk-badge', getRiskClass(result.risk_classification)]"
+                >
                     {{ result.risk_classification }}
                 </div>
-                <div :class="['severity-badge', getSeverityClass(result.severity)]">
+                <div
+                    v-if="result.severity"
+                    :class="['severity-badge', getSeverityClass(result.severity)]"
+                >
                     {{ result.severity }}
                 </div>
             </div>
 
             <div class="analysis-comment">
                 <h4>요약</h4>
-                <p>{{ result.summary }}</p>
+                <div
+                    v-markdown="
+                        result.summary || result.analysis_comment || '요약 정보가 없습니다.'
+                    "
+                ></div>
             </div>
 
             <div class="policy-recommendations">
@@ -31,7 +41,11 @@
                 <div class="recommendation-group">
                     <h5 class="remove-title">제거 권장 권한</h5>
                     <div
-                        v-if="result.policy_recommendation.REMOVE.length > 0"
+                        v-if="
+                            result.policy_recommendation &&
+                            result.policy_recommendation.REMOVE &&
+                            result.policy_recommendation.REMOVE.length > 0
+                        "
                         class="permission-list"
                     >
                         <div
@@ -49,7 +63,14 @@
 
                 <div class="recommendation-group">
                     <h5 class="add-title">추가 권장 권한</h5>
-                    <div v-if="result.policy_recommendation.ADD.length > 0" class="permission-list">
+                    <div
+                        v-if="
+                            result.policy_recommendation &&
+                            result.policy_recommendation.ADD &&
+                            result.policy_recommendation.ADD.length > 0
+                        "
+                        class="permission-list"
+                    >
                         <div
                             v-for="(perm, idx) in result.policy_recommendation.ADD"
                             :key="idx"
@@ -63,9 +84,12 @@
                     <p v-else class="empty-list">추가 권장 권한이 없습니다.</p>
                 </div>
 
-                <div v-if="result.policy_recommendation.Reason" class="reason">
+                <div
+                    v-if="result.policy_recommendation && result.policy_recommendation.Reason"
+                    class="reason"
+                >
                     <h5>추천 이유</h5>
-                    <p>{{ result.policy_recommendation.Reason }}</p>
+                    <div v-markdown="result.policy_recommendation.Reason"></div>
                 </div>
             </div>
 
@@ -82,8 +106,9 @@
 </template>
 
 <script lang="ts">
-    import { defineComponent, PropType, ref } from 'vue';
-    import { AnalysisResult } from '@/services/policyService';
+    import type { PropType } from 'vue';
+    import { defineComponent, ref } from 'vue';
+    import type { AnalysisResult } from '@/services/policyService';
 
     export default defineComponent({
         name: 'PolicyResultCard',
@@ -309,6 +334,63 @@
         margin-top: 0;
         margin-bottom: 10px;
         color: #333;
+    }
+
+    /* 마크다운 스타일 */
+    [v-markdown] {
+        line-height: 1.6;
+    }
+
+    [v-markdown] a {
+        color: #007bff;
+        text-decoration: none;
+    }
+
+    [v-markdown] a:hover {
+        text-decoration: underline;
+    }
+
+    [v-markdown] code {
+        background-color: #f8f9fa;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+
+    [v-markdown] pre {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 4px;
+        overflow-x: auto;
+    }
+
+    [v-markdown] pre code {
+        background-color: transparent;
+        padding: 0;
+    }
+
+    [v-markdown] ul,
+    [v-markdown] ol {
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+        padding-left: 1.5rem;
+    }
+
+    [v-markdown] li {
+        margin-bottom: 0.25rem;
+    }
+
+    [v-markdown] h1,
+    [v-markdown] h2,
+    [v-markdown] h3 {
+        margin-top: 1.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    [v-markdown] p {
+        margin-top: 0;
+        margin-bottom: 1rem;
     }
 
     .policy-recommendations {
