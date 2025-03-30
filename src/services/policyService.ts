@@ -48,7 +48,7 @@ class PolicyService {
      */
     async getDemoAnalysis(): Promise<AnalysisResult[]> {
         try {
-            const response = await axios.get<AnalysisResult[]>(`${this.apiUrl}/test/demo`);
+            const response = await axios.get<AnalysisResult[]>(`${this.apiUrl}/cloudtrail/analyze-logs`);
 
             return response.data;
         } catch (error: any) {
