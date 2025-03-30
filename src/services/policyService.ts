@@ -146,54 +146,24 @@ class PolicyService {
     }
 
     /**
-     * 정책 변경 사항 적용 (모의 함수)
+     * 정책 변경 사항 적용 - 실제 백엔드 API를 호출
      * @param updates 적용할 정책 업데이트 목록
      * @returns 적용 결과
      */
     async applyPolicyChanges(updates: PolicyUpdates[]): Promise<any> {
         try {
-            // 실제 API가 없으므로, 모의 응답을 반환
             console.log('정책 변경 적용 요청:', updates);
-
-            // 백엔드 API 호출 시뮬레이션 (2초 지연)
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-
-            // 모의 성공 응답
-            return {
-                status: 'success',
-                message: '정책이 성공적으로 적용되었습니다.',
-                applied_changes: updates.length,
-                timestamp: new Date().toISOString(),
-            };
-        } catch (error: any) {
-            console.error('Error applying policy changes:', error);
-            throw new Error('정책 변경 적용 중 오류가 발생했습니다.');
-        }
-    }
-
-    /**
-     * 정책 변경 사항을 백엔드 API로 전송
-     * @param userArn 사용자 ARN
-     * @param policyRecommendation 적용할 정책 추천 내용
-     * @returns 적용 결과
-     */
-    async applyPolicyChangesToBackend(userArn: string, policyRecommendation: PolicyRecommendation): Promise<any> {
-        try {
-            console.log('정책 변경 백엔드 API 요청:', { userArn, policyRecommendation });
 
             // 백엔드 API 호출
             const response = await axios.post(
-                `${this.apiUrl}/policy_recommendation/apply-policy-changes`,
-                {
-                    user_arn: userArn,
-                    policy_recommendation: policyRecommendation
-                },
+                `${this.apiUrl}/policy-recommendation/apply-policy-changes`,
+                updates,
                 { withCredentials: true }
             );
 
             return response.data;
         } catch (error: any) {
-            console.error('Error applying policy changes to backend:', error);
+            console.error('Error applying policy changes:', error);
             throw new Error(
                 error.response?.data?.detail || '정책 변경 적용 중 오류가 발생했습니다.'
             );
