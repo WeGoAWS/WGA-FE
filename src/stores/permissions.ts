@@ -176,16 +176,37 @@ export const usePermissionsStore = defineStore('permissions', {
     },
 
     // 모든 사용자의 권한 정보 추출
+    // 모든 사용자의 권한 정보 추출 (정확한 이름 매칭 사용)
     extractAllUserPermissions() {
       // 사용자별 권한 맵 초기화
       this.userPermissionsMap.clear();
       
       // 각 사용자에 대한 권한 추출
       this.userArns.forEach(userArn => {
+        // 정확한 사용자 이름 매칭을 위한 함수
+        const exactUserMatch = (resultUser: string, targetUserArn: string): boolean => {
+          // 정확히 일치하는 경우
+          if (resultUser === targetUserArn) return true;
+          
+          // ARN 형식에서 사용자/역할 이름 추출 (마지막 부분)
+          // 예: "arn:aws:iam::123456789012:user/username" -> "username"
+          const getExactUserName = (arn: string): string => {
+            const parts = arn.split('/');
+            return parts.length > 1 ? parts[parts.length - 1] : arn;
+          };
+          
+          // 추출된 정확한 사용자/역할 이름 비교
+          const resultUserName = getExactUserName(resultUser);
+          const targetUserName = getExactUserName(targetUserArn);
+          
+          return resultUserName === targetUserName;
+        };
+        
+        // 정확한 매칭으로 해당 사용자의 결과만 필터링
         const userResults = this.analysisResults.filter(
           (result: AnalysisResult) => {
             if (!result || !result.user) return false;
-            return result.user === userArn || result.user.includes(userArn);
+            return exactUserMatch(result.user, userArn);
           }
         );
 
@@ -200,7 +221,7 @@ export const usePermissionsStore = defineStore('permissions', {
 
         // 각 분석 결과에서 권한 추출
         userResults.forEach((result: AnalysisResult) => {
-          if (result && result.policy_recommendation) {
+          if (result.policy_recommendation) {
             // 추가 권한
             if (result.policy_recommendation.ADD && Array.isArray(result.policy_recommendation.ADD)) {
               result.policy_recommendation.ADD.forEach((action: string) => {
@@ -242,64 +263,85 @@ export const usePermissionsStore = defineStore('permissions', {
         return;
       }
       
-      // 선택된 사용자들의 권한을 조합
-      const addPermsMap = new Map<string, PermissionChange>();
-      const removePermsMap = new Map<string, PermissionChange>();
-      
-      this.selectedUserArns.forEach(arn => {
-        const userPerms = this.userPermissionsMap.get(arn);
+      // 선택된 첫 번째 사용자의 권한만 표시 (각 사용자의 권한을 개별적으로 보여주기 위함)
+      if (this.selectedUserArns.length === 1) {
+        const userArn = this.selectedUserArns[0];
+        const userPerms = this.userPermissionsMap.get(userArn);
+        
         if (userPerms) {
-          // 추가 권한 처리
-          userPerms.add.forEach(perm => {
-            if (!addPermsMap.has(perm.action)) {
-              addPermsMap.set(perm.action, { ...perm, apply: false });
-            }
-          });
-          
-          // 제거 권한 처리
-          userPerms.remove.forEach(perm => {
-            if (!removePermsMap.has(perm.action)) {
-              removePermsMap.set(perm.action, { ...perm, apply: false });
-            }
-          });
+          // 깊은 복사를 사용하여 원본 객체 변경 방지
+          this.combinedAddPermissions = userPerms.add.map(perm => ({...perm}));
+          this.combinedRemovePermissions = userPerms.remove.map(perm => ({...perm}));
+        } else {
+          this.combinedAddPermissions = [];
+          this.combinedRemovePermissions = [];
         }
-      });
+        return;
+      }
       
-      this.combinedAddPermissions = Array.from(addPermsMap.values());
-      this.combinedRemovePermissions = Array.from(removePermsMap.values());
+      // 여러 사용자가 선택된 경우, UI에서는 탭으로 처리하므로 combinedPermissions 비워둠
+      // 실제 적용시에는 각 사용자마다 개별적인 권한을 사용함
+      this.combinedAddPermissions = [];
+      this.combinedRemovePermissions = [];
     },
 
     // 정책 변경사항 적용 (다중 사용자 지원)
     async applyPolicyChanges() {
-      if (this.selectedUserArns.length === 0 || !this.hasChangesToApply) return;
+      if (this.selectedUserArns.length === 0) return;
 
       this.submitting = true;
       this.error = '';
       this.successMessage = '';
 
       try {
-        // 선택된 권한들만 필터링
-        const addSelected = this.combinedAddPermissions.filter((p) => p.apply);
-        const removeSelected = this.combinedRemovePermissions.filter((p) => p.apply);
+        // 각 사용자별로 개별 변경사항을 적용
+        const policyUpdates: PolicyUpdates[] = [];
+        
+        // 각 사용자마다 해당 사용자의 권한 변경사항을 찾아서 적용
+        for (const userArn of this.selectedUserArns) {
+          const userPermissions = this.userPermissionsMap.get(userArn);
+          
+          if (userPermissions) {
+            // 해당 사용자의 권한 중 적용할 항목만 필터링
+            const addSelected = userPermissions.add.filter((p) => p.apply);
+            const removeSelected = userPermissions.remove.filter((p) => p.apply);
+            
+            // 적용할 권한이 있는 경우에만 업데이트 목록에 추가
+            if (addSelected.length > 0 || removeSelected.length > 0) {
+              policyUpdates.push({
+                user_arn: userArn,
+                add_permissions: addSelected,
+                remove_permissions: removeSelected,
+              });
+            }
+          }
+        }
 
-        // 각 사용자별 변경사항 생성
-        const policyUpdates: PolicyUpdates[] = this.selectedUserArns.map(arn => ({
-          user_arn: arn,
-          add_permissions: addSelected,
-          remove_permissions: removeSelected,
-        }));
+        // 적용할 변경사항이 하나라도 있는 경우에만 API 호출
+        if (policyUpdates.length > 0) {
+          // 백엔드로 변경사항 전송
+          const result = await policyService.applyPolicyChanges(policyUpdates);
 
-        // 백엔드로 변경사항 전송 (다중 사용자 지원)
-        const result = await policyService.applyPolicyChanges(policyUpdates);
-
-        this.successMessage = `${this.selectedUserArns.length}명의 사용자에게 권한 변경사항이 성공적으로 적용되었습니다.`;
-
-        // 성공 후 체크박스 초기화
-        this.combinedAddPermissions.forEach((p) => (p.apply = false));
-        this.combinedRemovePermissions.forEach((p) => (p.apply = false));
+          this.successMessage = `${policyUpdates.length}명의 사용자에게 권한 변경사항이 성공적으로 적용되었습니다.`;
+          
+          // 성공 후 해당 사용자들의 체크박스 초기화
+          for (const userArn of this.selectedUserArns) {
+            const userPermissions = this.userPermissionsMap.get(userArn);
+            if (userPermissions) {
+              userPermissions.add.forEach((p) => (p.apply = false));
+              userPermissions.remove.forEach((p) => (p.apply = false));
+            }
+          }
+          
+          // 조합된 권한 목록도 초기화
+          this.combinedAddPermissions.forEach((p) => (p.apply = false));
+          this.combinedRemovePermissions.forEach((p) => (p.apply = false));
+        } else {
+          this.error = "적용할 권한 변경사항이 없습니다. 변경할 권한을 선택해주세요.";
+        }
       } catch (err: any) {
         console.error('권한 변경 적용 오류:', err);
-        this.error = err.message || '권한 변경 적용 중 오류가 발생했습니다.';
+        this.error = err.message || '정책 변경 적용 중 오류가 발생했습니다.';
       } finally {
         this.submitting = false;
       }
