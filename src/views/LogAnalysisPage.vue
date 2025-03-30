@@ -11,21 +11,21 @@
                     <button
                         @click="setCloudProvider('aws')"
                         class="cloud-button"
-                        :class="{ active: cloudProvider === 'aws' }"
+                        :class="{ active: store.cloudProvider === 'aws' }"
                     >
                         AWS
                     </button>
                     <button
                         @click="setCloudProvider('gcp')"
                         class="cloud-button"
-                        :class="{ active: cloudProvider === 'gcp' }"
+                        :class="{ active: store.cloudProvider === 'gcp' }"
                     >
                         GCP
                     </button>
                     <button
                         @click="setCloudProvider('azure')"
                         class="cloud-button"
-                        :class="{ active: cloudProvider === 'azure' }"
+                        :class="{ active: store.cloudProvider === 'azure' }"
                     >
                         Azure
                     </button>
@@ -34,28 +34,28 @@
 
             <div class="controls">
                 <div class="filter-section">
-                    <DateRangeFilter :loading="loading" @filter="handleDateFilter" />
-                    <UserFilter :loading="loading" @filter="handleUserFilter" />
+                    <DateRangeFilter :loading="store.loading" @filter="handleDateFilter" />
+                    <UserFilter :loading="store.loading" @filter="handleUserFilter" />
                 </div>
-                <button @click="testFunction" class="analyze-button" :disabled="loading">
-                    <span v-if="loading">분석 중...</span>
+                <button @click="startAnalysis" class="analyze-button" :disabled="store.loading">
+                    <span v-if="store.loading">분석 중...</span>
                     <span v-else>로그 분석 시작</span>
                 </button>
             </div>
 
-            <div v-if="error" class="error-message">
-                {{ error }}
+            <div v-if="store.error" class="error-message">
+                {{ store.error }}
             </div>
 
             <!-- 로딩 상태 표시 -->
-            <div v-if="loading" class="loading-container">
+            <div v-if="store.loading" class="loading-container">
                 <div class="spinner"></div>
                 <p>로그 분석 중입니다. 잠시만 기다려주세요...</p>
             </div>
 
             <!-- 결과가 있을 때 -->
-            <div v-if="showResults" class="results-container">
-                <div v-for="(result, index) in analysisResults" :key="index">
+            <div v-if="store.showResults" class="results-container">
+                <div v-for="(result, index) in store.analysisResults" :key="index">
                     <PolicyResultCard
                         :result="result"
                         :index="index"
@@ -64,15 +64,18 @@
                     />
                 </div>
 
-                <!-- 정책 변경사항 적용 컴포넌트 -->
-                <ApplyPermissionChanges
-                    v-if="analysisResults.length > 0"
-                    :analysis-results="analysisResults"
-                />
+                <!-- 정책 변경사항 적용 안내 -->
+                <div v-if="store.analysisResults.length > 0" class="apply-changes-info">
+                    <div class="info-box">
+                        <h3>정책 변경사항 적용</h3>
+                        <p>분석 결과에 따른 권한 변경사항을 적용하려면 권한 관리 페이지의 "정책 변경사항 적용" 탭으로 이동하세요.</p>
+                        <button @click="goToPermissionsPage" class="navigate-button">권한 관리 페이지로 이동</button>
+                    </div>
+                </div>
             </div>
 
             <!-- 결과가 없을 때 -->
-            <div v-if="!loading && !showResults" class="no-results">
+            <div v-if="!store.loading && !store.showResults" class="no-results">
                 <p>
                     아직 분석 결과가 없습니다. '로그 분석 시작' 버튼을 클릭하여 분석을 시작하세요.
                 </p>
@@ -82,14 +85,14 @@
 </template>
 
 <script lang="ts">
-    import { computed, defineComponent, ref } from 'vue';
+    import { defineComponent } from 'vue';
+    import { useRouter } from 'vue-router';
     import AppLayout from '@/layouts/AppLayout.vue';
     import DateRangeFilter from '@/components/DateRangeFilter.vue';
     import UserFilter from '@/components/UserFilter.vue';
     import PolicyResultCard from '@/components/PolicyResultCard.vue';
-    import ApplyPermissionChanges from '@/components/ApplyPermissionChanges.vue';
     import type { AnalysisResult } from '@/services/policyService';
-    import policyService from '@/services/policyService';
+    import { useLogAnalysisStore } from '@/stores/logAnalysis';
 
     export default defineComponent({
         name: 'LogAnalysisPage',
@@ -98,74 +101,45 @@
             DateRangeFilter,
             UserFilter,
             PolicyResultCard,
-            ApplyPermissionChanges,
         },
 
         setup() {
-            // 상태 변수들
-            const analysisResults = ref<AnalysisResult[]>([]);
-            const loading = ref(false);
-            const error = ref('');
-            const selectedUser = ref<string | null>(null);
-            const selectedDateRange = ref<{ startDate: string; endDate: string } | null>(null);
-            const cloudProvider = ref<'aws' | 'gcp' | 'azure'>('aws');
-
-            // 결과가 있는지 계산 (템플릿 조건부 렌더링용)
-            const showResults = computed(() => {
-                return analysisResults.value && analysisResults.value.length > 0;
-            });
-
-            // 테스트 함수 - 간단한 경고창 표시
-            const testFunction = () => {
-                console.log('분석 요청 호출됨');
-                getAnalysisData();
-            };
-
-            // 분석 데이터 가져오기
-            const getAnalysisData = async () => {
-                console.log('분석 데이터 요청 시작');
-                loading.value = true;
-                error.value = '';
-
-                try {
-                    // 테스트를 위해 간단한 지연 추가
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-                    // 실제 API 호출
-                    const results = await policyService.getDemoAnalysis();
-                    analysisResults.value = results;
-                    console.log('결과 받음:', results);
-                } catch (err: any) {
-                    console.error('API 호출 오류:', err);
-                    error.value = err.message || '데이터를 가져오는 중 오류가 발생했습니다.';
-                } finally {
-                    loading.value = false;
-                }
-            };
+            const store = useLogAnalysisStore();
+            const router = useRouter();
 
             // 클라우드 제공자 설정
             const setCloudProvider = (provider: 'aws' | 'gcp' | 'azure') => {
-                cloudProvider.value = provider;
+                store.setCloudProvider(provider);
             };
 
             // 사용자 필터 처리
             const handleUserFilter = (username: string | null) => {
-                selectedUser.value = username;
+                store.setUserFilter(username);
             };
 
             // 날짜 필터 처리
             const handleDateFilter = (dateRange: { startDate: string; endDate: string } | null) => {
-                selectedDateRange.value = dateRange;
+                store.setDateFilter(dateRange);
+            };
+
+            // 분석 시작
+            const startAnalysis = () => {
+                store.getAnalysisData();
+            };
+
+            // 권한 관리 페이지로 이동
+            const goToPermissionsPage = () => {
+                router.push({ 
+                    path: '/permissions',
+                    query: { tab: 'policy-changes' }
+                });
             };
 
             // 분석 결과 저장
             const saveAnalysisResult = async (result: AnalysisResult) => {
-                try {
-                    // 저장 로직
-                    console.log('결과 저장:', result);
+                const success = await store.saveAnalysisResult(result);
+                if (success) {
                     alert('결과가 저장되었습니다.');
-                } catch (error: any) {
-                    console.error('저장 오류:', error);
                 }
             };
 
@@ -186,17 +160,14 @@
             };
 
             return {
-                analysisResults,
-                loading,
-                error,
-                cloudProvider,
-                showResults,
-                testFunction,
+                store,
                 formatDate,
                 handleUserFilter,
                 handleDateFilter,
                 setCloudProvider,
+                startAnalysis,
                 saveAnalysisResult,
+                goToPermissionsPage,
             };
         },
     });
@@ -332,5 +303,39 @@
         color: #666;
         background-color: #f8f9fa;
         border-radius: 8px;
+    }
+
+    .apply-changes-info {
+        margin-top: 20px;
+    }
+
+    .info-box {
+        background-color: #e9f5ff;
+        border: 1px solid #b6dfff;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .info-box h3 {
+        color: #0066cc;
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+
+    .navigate-button {
+        margin-top: 10px;
+        background-color: #0066cc;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: background-color 0.2s;
+    }
+
+    .navigate-button:hover {
+        background-color: #0056b3;
     }
 </style>

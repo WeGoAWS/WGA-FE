@@ -1,5 +1,4 @@
 // src/services/policyService.ts
-// src/services/policyService.ts
 import axios from 'axios';
 
 // 정책 추천 관련 인터페이스
@@ -13,14 +12,17 @@ export interface AnalysisResult {
     date: string;
     user: string;
     log_count: number;
-    risk_classification: string;
-    severity: string;
-    summary: string;
+    analysis_timestamp?: string;
     analysis_comment: string;
+    risk_level?: string;
+    risk_classification?: string;
+    severity?: string;
+    summary?: string;
     policy_recommendation: PolicyRecommendation;
+    type?: string | null;
 }
 
-export interface AnalysisResponse {
+export interface AnalysisResultList {
     results: AnalysisResult[];
 }
 
@@ -41,6 +43,27 @@ class PolicyService {
 
     constructor() {
         this.apiUrl = import.meta.env.API_URL || 'http://localhost:8000';
+    }
+
+    /**
+     * 백엔드 API에서 권한 분석 결과 가져오기
+     * @returns 분석 결과 목록
+     */
+    async getMultipleAnalyses(): Promise<AnalysisResult[]> {
+        try {
+            const response = await axios.get<AnalysisResult[]>(
+                `${this.apiUrl}/policy-recommendation/process-multiple-analyses`,
+                { withCredentials: true }
+            );
+
+            return response.data;
+        } catch (error: any) {
+            console.error('Error fetching multiple analyses:', error);
+            throw new Error(
+                error.response?.data?.detail || 
+                '권한 분석 결과를 가져오는 중 오류가 발생했습니다.'
+            );
+        }
     }
 
     /**
@@ -149,13 +172,42 @@ class PolicyService {
     }
 
     /**
-     * 사용자 ARN 목록 가져오기 (데모 데이터)
+     * 정책 변경 사항을 백엔드 API로 전송
+     * @param userArn 사용자 ARN
+     * @param policyRecommendation 적용할 정책 추천 내용
+     * @returns 적용 결과
+     */
+    async applyPolicyChangesToBackend(userArn: string, policyRecommendation: PolicyRecommendation): Promise<any> {
+        try {
+            console.log('정책 변경 백엔드 API 요청:', { userArn, policyRecommendation });
+
+            // 백엔드 API 호출
+            const response = await axios.post(
+                `${this.apiUrl}/policy_recommendation/apply-policy-changes`,
+                {
+                    user_arn: userArn,
+                    policy_recommendation: policyRecommendation
+                },
+                { withCredentials: true }
+            );
+
+            return response.data;
+        } catch (error: any) {
+            console.error('Error applying policy changes to backend:', error);
+            throw new Error(
+                error.response?.data?.detail || '정책 변경 적용 중 오류가 발생했습니다.'
+            );
+        }
+    }
+
+    /**
+     * 사용자 ARN 목록 가져오기
      * @returns 사용자 ARN 목록
      */
     async getUserArns(): Promise<string[]> {
         try {
-            // 데모 API에서 사용자 목록 추출
-            const results = await this.getDemoAnalysis();
+            // 분석 결과에서 사용자 ARN 추출
+            const results = await this.getMultipleAnalyses();
             const uniqueUsers = [...new Set(results.map((result) => result.user))];
             return uniqueUsers;
         } catch (error: any) {
