@@ -42,7 +42,7 @@ class PolicyService {
     private apiUrl: string;
 
     constructor() {
-        this.apiUrl = import.meta.env.API_URL || 'http://localhost:8000';
+        this.apiUrl = import.meta.env.VITE_API_URL || '/api';
     }
 
     /**
