@@ -185,35 +185,41 @@ export const useAuthStore = defineStore('auth', {
                 return false;
             }
         },
-
         // 로그아웃
-        logout() {
-            const clientId = import.meta.env.COGNITO_CLIENT_ID;
-            const redirectUri = import.meta.env.COGNITO_REDIRECT_URI;
-
-            // 상태 초기화
-            this.user = null;
-            this.tokens = {
-                idToken: null,
-                accessToken: null,
-                refreshToken: null,
-            };
-            this.isAuthenticated = false;
-
-            // Cognito 로그아웃 URL 구성
-            const cognitoDomain = import.meta.env.COGNITO_DOMAIN;
-
-            if (!cognitoDomain) {
-                console.error('Cognito 도메인이 설정되지 않았습니다. 로컬 로그아웃만 수행합니다.');
-                window.location.href = redirectUri;
-                return;
+        async logout() {
+            try {
+                const clientId = import.meta.env.COGNITO_CLIENT_ID;
+                const redirectUri = import.meta.env.COGNITO_REDIRECT_URI;
+        
+                // 상태 초기화
+                this.user = null;
+                this.tokens = {
+                    idToken: null,
+                    accessToken: null,
+                    refreshToken: null,
+                };
+                this.isAuthenticated = false;
+        
+                // Cognito 로그아웃 URL 구성
+                const cognitoDomain = import.meta.env.COGNITO_DOMAIN;
+        
+                if (!cognitoDomain) {
+                    console.error('Cognito 도메인이 설정되지 않았습니다. 로컬 로그아웃만 수행합니다.');
+                    window.location.href = redirectUri;
+                    return;
+                }
+        
+                // AWS Cognito 호스팅 UI 로그아웃 URL
+                const logoutUrl = `https://${cognitoDomain}.auth.us-east-1.amazoncognito.com/logout?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+                console.log('🔐 Logout URL:', logoutUrl);
+                // 로그아웃 리다이렉트
+                window.location.href = logoutUrl;
+            } catch (error) {
+                console.error('로그아웃 중 오류 발생:', error);
+                
+                // 오류 발생해도 리다이렉트 시도
+                window.location.href = import.meta.env.COGNITO_REDIRECT_URI;
             }
-
-            // AWS Cognito 호스팅 UI 로그아웃 URL
-            const logoutUrl = `https://${cognitoDomain}.auth.us-east-1.amazoncognito.com/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(redirectUri)}`;
-
-            // 로그아웃 리다이렉트
-            window.location.href = logoutUrl;
-        },
+        }
     },
 });

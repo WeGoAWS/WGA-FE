@@ -22,6 +22,7 @@
     import { useRoute, useRouter } from 'vue-router';
     import { useAuthStore } from '@/stores/auth';
     import AuthCheck from '@/components/AuthCheck.vue';
+    import axios from 'axios';
 
     export default defineComponent({
         name: 'RedirectView',
@@ -47,7 +48,7 @@
                     }
 
                     // 인증 상태 확인
-                    const isAuthenticated = await authStore.handleTokenFromBackend();
+                    const isAuthenticated = await authStore.verifyTokenWithBackend();
 
                     if (isAuthenticated) {
                         // 세션 스토리지에 저장된 리다이렉트 경로가 있는지 확인

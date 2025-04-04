@@ -22,7 +22,7 @@
             onMounted(async () => {
                 try {
                     // 세션 기반 인증 상태 확인
-                    const isAuthenticated = await authStore.handleTokenFromBackend();
+                    const isAuthenticated = await authStore.verifyTokenWithBackend();
 
                     // 인증 처리 완료 후 이전에 저장된 경로로 리다이렉트
                     const redirectPath = sessionStorage.getItem('auth_redirect_path');
