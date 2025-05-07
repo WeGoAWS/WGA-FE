@@ -1,4 +1,4 @@
-<!-- src/views/ChatbotPage.vue -->
+<!-- src/views/ChatbotPage.vue 수정 -->
 <template>
     <AppLayout>
         <div class="chatbot-container">
@@ -43,10 +43,35 @@
                 </div>
 
                 <div class="chat-messages" ref="messagesContainer">
-                    <div
-                        v-if="!store.currentSession || store.currentMessages.length === 0"
-                        class="empty-chat"
-                    >
+                    <template v-if="store.currentSession && store.currentMessages.length > 0">
+                        <div
+                            v-for="message in store.currentMessages"
+                            :key="message.id"
+                            class="message"
+                            :class="{
+                                'user-message': message.sender === 'user',
+                                'bot-message': message.sender === 'bot',
+                                typing: message.isTyping,
+                                'appear-animation': message.animationState === 'appear',
+                            }"
+                        >
+                            <div v-if="message.isTyping" class="typing-indicator">
+                                <span class="dot"></span>
+                                <span class="dot"></span>
+                                <span class="dot"></span>
+                            </div>
+                            <div
+                                v-else
+                                class="message-content"
+                                v-html="message.displayText || message.text"
+                            ></div>
+                            <div class="message-time">
+                                {{ formatMessageTime(message.timestamp) }}
+                            </div>
+                        </div>
+                    </template>
+
+                    <div v-else class="empty-chat">
                         <div class="empty-chat-content">
                             <h2>새로운 대화 시작하기</h2>
                             <p>아래 예시 질문을 클릭하거나 직접 질문을 입력하세요.</p>
@@ -85,23 +110,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <template v-else>
-                        <div
-                            v-for="message in store.currentMessages"
-                            :key="message.id"
-                            class="message"
-                            :class="{
-                                'user-message': message.sender === 'user',
-                                'bot-message': message.sender === 'bot',
-                            }"
-                        >
-                            <div class="message-content">{{ message.text }}</div>
-                            <div class="message-time">
-                                {{ formatMessageTime(message.timestamp) }}
-                            </div>
-                        </div>
-                    </template>
                 </div>
 
                 <div class="chat-input-container">
@@ -149,10 +157,19 @@
             const messageText = ref('');
             const messagesContainer = ref<HTMLElement | null>(null);
 
-            onMounted(() => {
+            onMounted(async () => {
                 // 챗봇 세션 로드
                 if (store.sessions.length === 0) {
-                    fetchSessions();
+                    await fetchSessions();
+                }
+
+                // 대화 페이지로 오면서 저장된 질문이 있는지 확인
+                const pendingQuestion = sessionStorage.getItem('pendingQuestion');
+                if (pendingQuestion) {
+                    // 질문을 찾았으면 전송하고 세션스토리지에서 제거
+                    await store.sendMessage(pendingQuestion);
+                    sessionStorage.removeItem('pendingQuestion');
+                    scrollToBottom();
                 }
             });
 
@@ -166,8 +183,8 @@
             );
 
             // 세션 목록 가져오기
-            const fetchSessions = () => {
-                store.fetchSessions();
+            const fetchSessions = async () => {
+                await store.fetchSessions();
             };
 
             // 새 채팅 세션 생성
@@ -186,8 +203,10 @@
             const sendMessage = async () => {
                 if (!messageText.value.trim() || store.waitingForResponse) return;
 
-                await store.sendMessage(messageText.value);
+                const text = messageText.value;
                 messageText.value = '';
+
+                await store.sendMessage(text);
                 scrollToBottom();
             };
 
@@ -450,20 +469,107 @@
     .message {
         max-width: 80%;
         padding: 12px;
-        border-radius: 10px;
+        border-radius: 20px;
         position: relative;
+        animation-duration: 0.3s;
+        animation-fill-mode: both;
+        transform-origin: bottom;
     }
 
     .user-message {
         align-self: flex-end;
-        background-color: #007bff;
+        background-color: #0b93f6;
         color: white;
+        border-bottom-right-radius: 5px;
+        animation-name: sendMessage;
     }
 
     .bot-message {
         align-self: flex-start;
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
+        background-color: #e5e5ea;
+        color: black;
+        border-bottom-left-radius: 5px;
+        animation-name: receiveMessage;
+    }
+
+    @keyframes sendMessage {
+        0% {
+            transform: translateY(20px) scale(0.8);
+            opacity: 0;
+        }
+        100% {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+    }
+
+    @keyframes receiveMessage {
+        0% {
+            transform: translateY(10px) scale(0.9);
+            opacity: 0;
+        }
+        100% {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+    }
+
+    .appear-animation {
+        animation-name: appearMessage;
+        animation-duration: 0.3s;
+    }
+
+    @keyframes appearMessage {
+        0% {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .typing-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        min-height: 20px;
+        min-width: 40px;
+    }
+
+    .dot {
+        width: 8px;
+        height: 8px;
+        background-color: rgba(0, 0, 0, 0.5);
+        border-radius: 50%;
+        animation: dotPulse 1.4s infinite ease-in-out;
+    }
+
+    .dot:nth-child(1) {
+        animation-delay: 0s;
+    }
+
+    .dot:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .dot:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @keyframes dotPulse {
+        0%,
+        60%,
+        100% {
+            transform: scale(0.8);
+            opacity: 0.6;
+        }
+        30% {
+            transform: scale(1.2);
+            opacity: 1;
+        }
     }
 
     .message-content {
@@ -487,10 +593,20 @@
         flex: 1;
         padding: 12px;
         border: 1px solid #ced4da;
-        border-radius: 4px;
+        border-radius: 20px;
         resize: none;
         height: 50px;
         font-family: inherit;
+        background-color: #f5f5f5;
+        transition:
+            background-color 0.2s,
+            border-color 0.2s;
+    }
+
+    .chat-input:focus {
+        outline: none;
+        border-color: #007bff;
+        background-color: #fff;
     }
 
     .send-button {
@@ -498,8 +614,13 @@
         background-color: #007bff;
         color: white;
         border: none;
-        border-radius: 4px;
+        border-radius: 20px;
         cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .send-button:hover:not(:disabled) {
+        background-color: #0069d9;
     }
 
     .send-button:disabled {
@@ -520,5 +641,16 @@
         border: 1px solid #6c757d;
         border-radius: 4px;
         cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .clear-button:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* 텍스트 타이핑 애니메이션 클래스 */
+    .typing .message-content {
+        white-space: pre-wrap;
+        overflow: hidden;
     }
 </style>
