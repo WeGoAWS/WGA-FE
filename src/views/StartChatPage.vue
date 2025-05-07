@@ -15,7 +15,30 @@
                     @keydown.enter.prevent="startNewChat"
                 ></textarea>
                 <button @click="startNewChat" class="send-button" :disabled="!messageText.trim()">
-                    질문하기
+                    <span>질문하기</span>
+                    <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        style="margin-left: 8px"
+                    >
+                        <path
+                            d="M22 2L11 13"
+                            stroke="white"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                        <path
+                            d="M22 2L15 22L11 13L2 9L22 2Z"
+                            stroke="white"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </svg>
                 </button>
             </div>
 
@@ -192,34 +215,63 @@
 
     .start-chat-input-container {
         width: 100%;
+        max-width: 768px;
         display: flex;
         margin-bottom: 3rem;
+        position: relative;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+
+    .start-chat-input-container:focus-within {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
     }
 
     .start-chat-input {
         flex: 1;
-        padding: 1rem;
+        padding: 1.25rem 1.5rem;
         font-size: 1rem;
-        border: 1px solid #ced4da;
-        border-radius: 8px 0 0 8px;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px 0 0 12px;
         resize: none;
         height: 60px;
         font-family: inherit;
+        transition: border-color 0.3s;
+        background-color: #fff;
+    }
+
+    .start-chat-input:focus {
+        outline: none;
+        border-color: #007bff;
     }
 
     .send-button {
-        padding: 0 1.5rem;
+        padding: 0 1.8rem;
         background-color: #007bff;
         color: white;
         border: none;
-        border-radius: 0 8px 8px 0;
+        border-radius: 0 12px 12px 0;
         cursor: pointer;
         font-size: 1rem;
-        font-weight: 500;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .send-button:hover:not(:disabled) {
+        background-color: #0056b3;
+    }
+
+    .send-button:active:not(:disabled) {
+        transform: scale(0.98);
     }
 
     .send-button:disabled {
-        background-color: #ccc;
+        background-color: #b3d9ff;
         cursor: not-allowed;
     }
 
@@ -231,6 +283,7 @@
         text-align: center;
         margin-bottom: 1.5rem;
         color: #232f3e;
+        font-weight: 600;
     }
 
     .example-questions {
@@ -241,44 +294,89 @@
 
     .question-category {
         background-color: #f8f9fa;
-        border-radius: 8px;
+        border-radius: 12px;
         padding: 1.5rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        transition: transform 0.3s ease;
+    }
+
+    .question-category:hover {
+        transform: translateY(-4px);
     }
 
     .question-category h3 {
         margin-bottom: 1rem;
         color: #232f3e;
         font-size: 1.1rem;
-        padding-bottom: 0.5rem;
+        padding-bottom: 0.7rem;
         border-bottom: 1px solid #dee2e6;
+        font-weight: 600;
     }
 
     .example-question {
         display: block;
         width: 100%;
         text-align: left;
-        padding: 0.8rem 1rem;
-        margin-bottom: 0.75rem;
+        padding: 0.9rem 1.2rem;
+        margin-bottom: 0.8rem;
         background-color: white;
-        border: 1px solid #dee2e6;
-        border-radius: 4px;
+        border: 1px solid #e6e6e6;
+        border-radius: 8px;
         cursor: pointer;
         transition: all 0.2s ease;
         color: #333;
         font-size: 0.95rem;
+        font-weight: 400;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
     }
 
     .example-question:hover {
-        background-color: #e9ecef;
-        border-color: #ced4da;
+        background-color: #f0f7ff;
+        border-color: #b3d9ff;
         transform: translateY(-2px);
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .example-question:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 
     @media (max-width: 768px) {
         .example-questions {
             grid-template-columns: 1fr;
         }
+
+        .start-chat-input-container {
+            flex-direction: column;
+            box-shadow: none;
+        }
+
+        .start-chat-input {
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 0.5rem;
+        }
+
+        .send-button {
+            width: 100%;
+            padding: 0.8rem;
+            border-radius: 12px;
+        }
+    }
+    
+    .send-button {
+        padding: 0 1.5rem;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 0 12px 12px 0;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 </style>

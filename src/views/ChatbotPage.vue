@@ -125,8 +125,30 @@
                         class="send-button"
                         :disabled="!messageText.trim() || store.waitingForResponse"
                     >
-                        <span v-if="store.waitingForResponse">응답 중...</span>
-                        <span v-else>전송</span>
+                        <span v-if="store.waitingForResponse" class="sending-text">전송 중...</span>
+                        <svg
+                            v-else
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M22 2L11 13"
+                                stroke="white"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                            <path
+                                d="M22 2L15 22L11 13L2 9L22 2Z"
+                                stroke="white"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
                     </button>
                 </div>
 
@@ -586,21 +608,35 @@
     .chat-input-container {
         margin-top: 20px;
         display: flex;
-        gap: 10px;
+        gap: 12px;
+        position: relative;
+        background-color: #fff;
+        border-radius: 16px;
+        padding: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+
+    .chat-input-container:focus-within {
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
     }
 
     .chat-input {
         flex: 1;
-        padding: 12px;
-        border: 1px solid #ced4da;
-        border-radius: 20px;
+        padding: 14px 18px;
+        border: 1px solid #e8e8e8;
+        border-radius: 12px;
         resize: none;
-        height: 50px;
+        height: 56px;
+        min-height: 56px;
+        max-height: 120px;
         font-family: inherit;
-        background-color: #f5f5f5;
-        transition:
-            background-color 0.2s,
-            border-color 0.2s;
+        font-size: 1rem;
+        line-height: 1.5;
+        color: #333;
+        background-color: #f9f9f9;
+        transition: all 0.3s ease;
+        overflow-y: auto;
     }
 
     .chat-input:focus {
@@ -609,48 +645,77 @@
         background-color: #fff;
     }
 
+    .chat-input:disabled {
+        background-color: #f5f5f5;
+        cursor: not-allowed;
+        color: #999;
+    }
+
     .send-button {
-        padding: 0 20px;
+        min-width: 56px;
+        height: 56px;
         background-color: #007bff;
         color: white;
         border: none;
-        border-radius: 20px;
+        border-radius: 12px;
         cursor: pointer;
-        transition: background-color 0.2s;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
     }
 
     .send-button:hover:not(:disabled) {
-        background-color: #0069d9;
+        background-color: #0056b3;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+    }
+
+    .send-button:active:not(:disabled) {
+        transform: translateY(1px);
+        box-shadow: 0 1px 2px rgba(0, 123, 255, 0.3);
     }
 
     .send-button:disabled {
-        background-color: #ccc;
+        background-color: #b3d9ff;
         cursor: not-allowed;
+        box-shadow: none;
     }
 
     .chat-actions {
-        margin-top: 10px;
+        margin-top: 16px;
         display: flex;
         justify-content: center;
     }
 
     .clear-button {
-        padding: 6px 12px;
+        padding: 8px 18px;
         background-color: transparent;
         color: #6c757d;
         border: 1px solid #6c757d;
-        border-radius: 4px;
+        border-radius: 8px;
         cursor: pointer;
-        transition: all 0.2s;
+        font-weight: 500;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
     }
 
     .clear-button:hover {
         background-color: #f8f9fa;
+        color: #495057;
+        border-color: #495057;
     }
 
     /* 텍스트 타이핑 애니메이션 클래스 */
     .typing .message-content {
         white-space: pre-wrap;
         overflow: hidden;
+    }
+
+    .sending-text {
+        font-size: 0.85rem;
+        white-space: nowrap;
     }
 </style>
