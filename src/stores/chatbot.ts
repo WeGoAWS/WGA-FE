@@ -271,9 +271,9 @@ export const useChatbotStore = defineStore('chatbot', {
 
                 // API 호출
                 const response = await axios.post(
-                    `${apiUrl}/chat`,
+                    `${apiUrl}/llm1`,
                     {
-                        message: userMessage,
+                        text: userMessage,
                         sessionId: this.currentSession?.id,
                     },
                     {

@@ -47,9 +47,9 @@
                     }
 
                     // 인증 상태 확인
-                    const isAuthenticated = await authStore.verifyTokenWithBackend();
+                    // const isAuthenticated = await authStore.verifyTokenWithBackend();
 
-                    if (isAuthenticated) {
+                    if (true) {
                         // 세션 스토리지에 저장된 리다이렉트 경로가 있는지 확인
                         const redirectPath = sessionStorage.getItem('auth_redirect_path');
                         if (redirectPath) {
