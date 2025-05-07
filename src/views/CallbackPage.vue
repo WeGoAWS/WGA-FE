@@ -51,7 +51,7 @@
                     if (success) {
                         console.log('Token exchange successful, redirecting to dashboard');
                         // 인증 성공 시 대시보드로 리다이렉트
-                        router.push('/dashboard');
+                        router.push('/chatbot');
                     } else {
                         throw new Error('토큰 교환 과정에서 오류가 발생했습니다.');
                     }

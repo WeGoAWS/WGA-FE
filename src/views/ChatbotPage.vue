@@ -5,9 +5,7 @@
             <div class="chatbot-sidebar">
                 <div class="sidebar-header">
                     <h2>대화 목록</h2>
-                    <button @click="createNewChat" class="new-chat-button">
-                        새 대화
-                    </button>
+                    <button @click="createNewChat" class="new-chat-button">새 대화</button>
                 </div>
 
                 <div v-if="store.loading" class="sidebar-loading">
@@ -16,9 +14,9 @@
                 </div>
 
                 <div v-else-if="store.hasSessions" class="chat-sessions">
-                    <div 
-                        v-for="session in store.sessions" 
-                        :key="session.id" 
+                    <div
+                        v-for="session in store.sessions"
+                        :key="session.id"
                         class="chat-session-item"
                         :class="{ active: store.currentSession?.id === session.id }"
                         @click="selectSession(session.id)"
@@ -36,10 +34,8 @@
 
             <div class="chatbot-main">
                 <div class="chat-header">
-                    <h1>AWS 보안 챗봇</h1>
-                    <p class="chat-description">
-                        AWS 클라우드 보안, 로그 분석, 권한 관리에 관한 질문을 할 수 있습니다.
-                    </p>
+                    <h1>AWS Agent</h1>
+                    <p class="chat-description">운영 정보/메뉴얼 질의</p>
                 </div>
 
                 <div class="error-message" v-if="store.error">
@@ -47,19 +43,43 @@
                 </div>
 
                 <div class="chat-messages" ref="messagesContainer">
-                    <div v-if="!store.currentSession || store.currentMessages.length === 0" class="empty-chat">
+                    <div
+                        v-if="!store.currentSession || store.currentMessages.length === 0"
+                        class="empty-chat"
+                    >
                         <div class="empty-chat-content">
                             <h2>새로운 대화 시작하기</h2>
                             <p>아래 예시 질문을 클릭하거나 직접 질문을 입력하세요.</p>
-                            
+
                             <div class="example-questions">
-                                <button @click="askExampleQuestion('AWS S3 버킷 접근 권한 설정은 어떻게 하나요?')" class="example-question">
+                                <button
+                                    @click="
+                                        askExampleQuestion(
+                                            'AWS S3 버킷 접근 권한 설정은 어떻게 하나요?',
+                                        )
+                                    "
+                                    class="example-question"
+                                >
                                     AWS S3 버킷 접근 권한 설정은 어떻게 하나요?
                                 </button>
-                                <button @click="askExampleQuestion('AWS CloudTrail 로그 분석 방법을 알려주세요.')" class="example-question">
+                                <button
+                                    @click="
+                                        askExampleQuestion(
+                                            'AWS CloudTrail 로그 분석 방법을 알려주세요.',
+                                        )
+                                    "
+                                    class="example-question"
+                                >
                                     AWS CloudTrail 로그 분석 방법을 알려주세요.
                                 </button>
-                                <button @click="askExampleQuestion('IAM 권한 최소화 원칙을 적용하는 방법은?')" class="example-question">
+                                <button
+                                    @click="
+                                        askExampleQuestion(
+                                            'IAM 권한 최소화 원칙을 적용하는 방법은?',
+                                        )
+                                    "
+                                    class="example-question"
+                                >
                                     IAM 권한 최소화 원칙을 적용하는 방법은?
                                 </button>
                             </div>
@@ -67,28 +87,33 @@
                     </div>
 
                     <template v-else>
-                        <div 
-                            v-for="message in store.currentMessages" 
-                            :key="message.id" 
+                        <div
+                            v-for="message in store.currentMessages"
+                            :key="message.id"
                             class="message"
-                            :class="{ 'user-message': message.sender === 'user', 'bot-message': message.sender === 'bot' }"
+                            :class="{
+                                'user-message': message.sender === 'user',
+                                'bot-message': message.sender === 'bot',
+                            }"
                         >
                             <div class="message-content">{{ message.text }}</div>
-                            <div class="message-time">{{ formatMessageTime(message.timestamp) }}</div>
+                            <div class="message-time">
+                                {{ formatMessageTime(message.timestamp) }}
+                            </div>
                         </div>
                     </template>
                 </div>
 
                 <div class="chat-input-container">
-                    <textarea 
-                        v-model="messageText" 
-                        class="chat-input" 
-                        placeholder="질문을 입력하세요..." 
+                    <textarea
+                        v-model="messageText"
+                        class="chat-input"
+                        placeholder="질문을 입력하세요..."
                         @keydown.enter.prevent="sendMessage"
                         :disabled="store.waitingForResponse"
                     ></textarea>
-                    <button 
-                        @click="sendMessage" 
+                    <button
+                        @click="sendMessage"
                         class="send-button"
                         :disabled="!messageText.trim() || store.waitingForResponse"
                     >
@@ -97,7 +122,10 @@
                     </button>
                 </div>
 
-                <div class="chat-actions" v-if="store.currentSession && store.currentMessages.length > 0">
+                <div
+                    class="chat-actions"
+                    v-if="store.currentSession && store.currentMessages.length > 0"
+                >
                     <button @click="clearChat" class="clear-button">대화 내용 지우기</button>
                 </div>
             </div>
@@ -106,7 +134,7 @@
 </template>
 
 <script lang="ts">
-    import { defineComponent, ref, onMounted, nextTick, watch } from 'vue';
+    import { defineComponent, nextTick, onMounted, ref, watch } from 'vue';
     import AppLayout from '@/layouts/AppLayout.vue';
     import { useChatbotStore } from '@/stores/chatbot';
 
@@ -129,9 +157,13 @@
             });
 
             // 메시지가 추가될 때마다 스크롤을 아래로 이동
-            watch(() => store.currentMessages, () => {
-                scrollToBottom();
-            }, { deep: true });
+            watch(
+                () => store.currentMessages,
+                () => {
+                    scrollToBottom();
+                },
+                { deep: true },
+            );
 
             // 세션 목록 가져오기
             const fetchSessions = () => {
@@ -153,7 +185,7 @@
             // 메시지 전송
             const sendMessage = async () => {
                 if (!messageText.value.trim() || store.waitingForResponse) return;
-                
+
                 await store.sendMessage(messageText.value);
                 messageText.value = '';
                 scrollToBottom();
@@ -187,7 +219,7 @@
                     return date.toLocaleDateString('ko-KR', {
                         year: 'numeric',
                         month: 'long',
-                        day: 'numeric'
+                        day: 'numeric',
                     });
                 } catch (e) {
                     return dateString;
@@ -200,7 +232,7 @@
                     const date = new Date(dateString);
                     return date.toLocaleTimeString('ko-KR', {
                         hour: '2-digit',
-                        minute: '2-digit'
+                        minute: '2-digit',
                     });
                 } catch (e) {
                     return '';
@@ -218,7 +250,7 @@
                 askExampleQuestion,
                 clearChat,
                 formatDate,
-                formatMessageTime
+                formatMessageTime,
             };
         },
     });

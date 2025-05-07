@@ -7,17 +7,13 @@ import { useAuthStore } from '@/stores/auth';
 import LoginPage from '@/views/LoginPage.vue';
 import CallbackPage from '@/views/CallbackPage.vue';
 import DashboardPage from '@/views/DashboardPage.vue';
-import LogAnalysisPage from '@/views/LogAnalysisPage.vue';
-import PermissionsPage from '@/views/PermissionsPage.vue';
-import ServerAccessPage from '@/views/ServerAccessPage.vue';
-import WeeklyReportPage from '@/views/WeeklyReportPage.vue';
 import ChatbotPage from '@/views/ChatbotPage.vue';
 
 // 라우트 설정
 const routes: Array<RouteRecordRaw> = [
     {
         path: '/',
-        redirect: '/dashboard',
+        redirect: '/chatbot',
     },
     {
         path: '/login',
@@ -35,30 +31,6 @@ const routes: Array<RouteRecordRaw> = [
         path: '/dashboard',
         name: 'Dashboard',
         component: DashboardPage,
-        meta: { requiresAuth: true },
-    },
-    {
-        path: '/log-analysis',
-        name: 'LogAnalysis',
-        component: LogAnalysisPage,
-        meta: { requiresAuth: true },
-    },
-    {
-        path: '/permissions',
-        name: 'Permissions',
-        component: PermissionsPage,
-        meta: { requiresAuth: true },
-    },
-    {
-        path: '/server-access',
-        name: 'ServerAccess',
-        component: ServerAccessPage,
-        meta: { requiresAuth: true },
-    },
-    {
-        path: '/weekly-report',
-        name: 'WeeklyReport',
-        component: WeeklyReportPage,
         meta: { requiresAuth: true },
     },
     {
