@@ -1,5 +1,6 @@
 // src/stores/chatbot.ts 수정 (계속)
 import { defineStore } from 'pinia';
+import axios from 'axios';
 
 interface ChatMessage {
     id: string;
@@ -184,11 +185,8 @@ export const useChatbotStore = defineStore('chatbot', {
 
                 this.currentSession!.messages.push(loadingMessage);
 
-                // 실제 API 호출을 통해 봇 응답을 가져오는 로직
-                // 여기서는 간단한 시뮬레이션
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-
-                const botResponseText = this.generateBotResponse(text);
+                // API 호출하여 봇 응답 가져오기
+                const botResponseText = await this.generateBotResponse(text);
 
                 // 로딩 메시지 제거
                 this.currentSession!.messages = this.currentSession!.messages.filter(
@@ -266,38 +264,37 @@ export const useChatbotStore = defineStore('chatbot', {
         },
 
         // 간단한 봇 응답 생성 함수 (실제 구현에서는 API 호출로 대체)
-        generateBotResponse(userMessage: string): string {
-            if (userMessage.toLowerCase().includes('안녕')) {
-                return '안녕하세요! 무엇을 도와드릴까요?';
-            } else if (
-                userMessage.toLowerCase().includes('aws') ||
-                userMessage.toLowerCase().includes('클라우드')
-            ) {
-                return 'AWS 클라우드 서비스에 관한 질문이군요. 보안, 로그 분석, 권한 관리 등 특정 주제에 대해 질문해 주시면 더 자세히 답변드릴 수 있습니다.';
-            } else if (
-                userMessage.toLowerCase().includes('로그') ||
-                userMessage.toLowerCase().includes('분석')
-            ) {
-                return '로그 분석은 보안 모니터링의 중요한 부분입니다. CloudTrail, CloudWatch Logs 등의 서비스를 활용하여 로그를 수집하고 분석할 수 있습니다. CloudWatch Logs Insights를 사용하면 로그 데이터를 쿼리하여 특정 패턴이나 이벤트를 찾아낼 수 있으며, Athena를 사용하면 S3에 저장된 로그 파일을 SQL로 분석할 수 있습니다.';
-            } else if (
-                userMessage.toLowerCase().includes('권한') ||
-                userMessage.toLowerCase().includes('iam')
-            ) {
-                return 'AWS IAM(Identity and Access Management)은 AWS 리소스에 대한 접근을 안전하게 제어하는 서비스입니다. 최소 권한 원칙을 따라 필요한 권한만 부여하는 것이 좋습니다. IAM 정책은 JSON 형식으로 작성되며, 사용자, 그룹, 역할에 연결하여 권한을 관리할 수 있습니다. AWS Organizations와 함께 SCP(Service Control Policy)를 사용하면 조직 전체의 권한 경계를 설정할 수 있습니다.';
-            } else if (
-                userMessage.toLowerCase().includes('s3') ||
-                userMessage.toLowerCase().includes('버킷')
-            ) {
-                return 'S3 버킷의 접근 권한은 여러 계층에서 관리할 수 있습니다. 버킷 정책은 특정 버킷에 대한 접근을 제어하는 리소스 기반 정책입니다. ACL(접근 제어 목록)은 개별 객체에 대한 권한을 설정할 수 있지만, 보안 관리의 복잡성 때문에 가능하면 버킷 정책과 IAM 정책을 사용하는 것이 권장됩니다. 또한 S3 Block Public Access 설정을 활성화하여 실수로 데이터가 공개되는 것을 방지할 수 있습니다.';
-            } else if (userMessage.toLowerCase().includes('cloudtrail')) {
-                return 'AWS CloudTrail은 AWS 계정의 거버넌스, 규정 준수, 운영 감사, 위험 감사를 지원하는 서비스입니다. CloudTrail은 AWS 계정 활동의 이벤트 기록을 제공하여 보안 분석, 리소스 변경 추적, 규정 준수 감사에 활용할 수 있습니다. CloudTrail 로그는 S3 버킷에 저장되며, CloudWatch Logs로 전송하여 실시간 모니터링 및 알림을 설정할 수 있습니다. 또한 Athena를 사용하여 로그 데이터를 SQL로 분석할 수 있습니다.';
-            } else if (
-                userMessage.toLowerCase().includes('비용') ||
-                userMessage.toLowerCase().includes('cost')
-            ) {
-                return 'AWS 비용 최적화를 위해서는 Cost Explorer와 AWS Budgets를 활용하는 것이 좋습니다. Cost Explorer는 비용 분석 및 예측 도구로, 서비스별, 리전별, 태그별로 비용을 분석할 수 있습니다. AWS Trusted Advisor는 비용 최적화 권장 사항을 제공하며, 미사용 리소스나 과도하게 프로비저닝된 리소스를 식별하는 데 도움이 됩니다. 리소스에 적절한 태그를 지정하면 비용 할당 및 관리가 용이해집니다. 또한 Savings Plans나 예약 인스턴스를 활용하면 장기 사용 리소스의 비용을 크게 절감할 수 있습니다.';
-            } else {
-                return '질문해 주셔서 감사합니다. 더 자세한 정보가 필요하시면 질문을 구체적으로 해주시거나, 로그 분석, IAM 권한, 보안 설정 등의 특정 주제에 대해 질문해 주세요. AWS CloudWatch, CloudTrail, GuardDuty, CostExplorer 등에 관한 질문도 도와드릴 수 있습니다.';
+        async generateBotResponse(userMessage: string): Promise<string> {
+            try {
+                // API URL 설정 - 환경변수나 설정에서 가져오는 것이 좋습니다
+                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+                // API 호출
+                const response = await axios.post(
+                    `${apiUrl}/chat`,
+                    {
+                        message: userMessage,
+                        sessionId: this.currentSession?.id,
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        withCredentials: true, // 쿠키 및 인증 정보 포함
+                    },
+                );
+
+                // API 응답에서 봇 메시지 추출
+                if (response.data && response.data.message) {
+                    return response.data.message;
+                }
+
+                throw new Error('유효한 응답을 받지 못했습니다');
+            } catch (error) {
+                console.error('봇 응답 API 호출 오류:', error);
+
+                // API 호출 실패 시 폴백 메시지 반환
+                return '죄송합니다. 응답을 처리하는 중에 오류가 발생했습니다. 다시 시도해 주세요.';
             }
         },
 
