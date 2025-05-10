@@ -1,6 +1,7 @@
-// src/stores/chatbot.ts 수정
+// frontend/src/stores/chatbot.ts
 import { defineStore } from 'pinia';
 import axios from 'axios';
+import { useAuthStore } from '@/stores/auth';
 
 interface ChatMessage {
     id: string;
@@ -64,87 +65,223 @@ export const useChatbotStore = defineStore('chatbot', {
             this.error = '';
 
             try {
-                // API 호출을 통해 채팅 세션 목록을 가져오는 로직
-                // 여기서는 간단한 시뮬레이션
-                await new Promise((resolve) => setTimeout(resolve, 500));
+                const authStore = useAuthStore();
+                const apiUrl = import.meta.env.VITE_API_URL || '/api';
 
-                const now = new Date().toISOString();
-                const yesterday = new Date(Date.now() - 86400000).toISOString();
+                // 로그인 여부 확인
+                if (!authStore.isAuthenticated) {
+                    throw new Error('로그인이 필요합니다.');
+                }
 
-                if (this.sessions.length === 0) {
-                    this.sessions = [
-                        {
-                            id: 'session-1',
-                            title: '보안 정책 질문',
-                            messages: [
-                                {
-                                    id: 'msg-1',
-                                    sender: 'user',
-                                    text: 'AWS S3 버킷 접근 권한 설정은 어떻게 하나요?',
-                                    timestamp: yesterday,
-                                },
-                                {
-                                    id: 'msg-2',
-                                    sender: 'bot',
-                                    text: 'AWS S3 버킷의 접근 권한은 버킷 정책과 IAM 정책을 통해 설정할 수 있습니다. 버킷 정책은 특정 버킷에 대한 접근을 제어하는 JSON 문서입니다. IAM 정책은 사용자, 그룹 또는 역할에 연결되어 AWS 리소스에 대한 접근을 제어합니다.',
-                                    timestamp: yesterday,
-                                },
-                            ],
-                            createdAt: yesterday,
-                            updatedAt: yesterday,
-                        },
-                        {
-                            id: 'session-2',
-                            title: '로그 분석 도구 추천',
-                            messages: [
-                                {
-                                    id: 'msg-3',
-                                    sender: 'user',
-                                    text: 'AWS 로그 분석에 좋은 도구가 무엇인가요?',
-                                    timestamp: now,
-                                },
-                                {
-                                    id: 'msg-4',
-                                    sender: 'bot',
-                                    text: 'AWS 로그 분석을 위해 여러 도구를 사용할 수 있습니다. AWS 자체 서비스로는 CloudWatch Logs Insights, Amazon Athena, Amazon OpenSearch Service 등이 있습니다. 서드파티 도구로는 Splunk, ELK Stack(Elasticsearch, Logstash, Kibana), Datadog 등이 인기가 있습니다.',
-                                    timestamp: now,
-                                },
-                            ],
-                            createdAt: now,
-                            updatedAt: now,
-                        },
-                    ];
+                // API 호출을 통해 채팅 세션 목록을 가져옴
+                const response = await axios.get(`${apiUrl}/sessions`, {
+                    params: { userId: authStore.user?.sub || authStore.user?.id },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${authStore.tokens.idToken}`,
+                    },
+                });
+
+                if (response.data && response.data.sessions) {
+                    this.sessions = response.data.sessions;
+
+                    // 현재 세션이 없고, 세션이 존재하면 첫번째 세션을 현재 세션으로 설정
+                    if (!this.currentSession && this.sessions.length > 0) {
+                        await this.selectSession(this.sessions[0].id);
+                    }
                 }
             } catch (err: any) {
                 console.error('채팅 세션 목록 가져오기 오류:', err);
                 this.error = err.message || '채팅 세션 목록을 불러오는 중 오류가 발생했습니다.';
+
+                // API 실패 시 로컬 데이터로 폴백 (개발 환경에서 사용)
+                if (import.meta.env.DEV) {
+                    const now = new Date().toISOString();
+                    const yesterday = new Date(Date.now() - 86400000).toISOString();
+
+                    if (this.sessions.length === 0) {
+                        this.sessions = [
+                            {
+                                id: 'session-1',
+                                title: '보안 정책 질문',
+                                messages: [
+                                    {
+                                        id: 'msg-1',
+                                        sender: 'user',
+                                        text: 'AWS S3 버킷 접근 권한 설정은 어떻게 하나요?',
+                                        timestamp: yesterday,
+                                    },
+                                    {
+                                        id: 'msg-2',
+                                        sender: 'bot',
+                                        text: 'AWS S3 버킷의 접근 권한은 버킷 정책과 IAM 정책을 통해 설정할 수 있습니다. 버킷 정책은 특정 버킷에 대한 접근을 제어하는 JSON 문서입니다. IAM 정책은 사용자, 그룹 또는 역할에 연결되어 AWS 리소스에 대한 접근을 제어합니다.',
+                                        timestamp: yesterday,
+                                    },
+                                ],
+                                createdAt: yesterday,
+                                updatedAt: yesterday,
+                            },
+                            {
+                                id: 'session-2',
+                                title: '로그 분석 도구 추천',
+                                messages: [
+                                    {
+                                        id: 'msg-3',
+                                        sender: 'user',
+                                        text: 'AWS 로그 분석에 좋은 도구가 무엇인가요?',
+                                        timestamp: now,
+                                    },
+                                    {
+                                        id: 'msg-4',
+                                        sender: 'bot',
+                                        text: 'AWS 로그 분석을 위해 여러 도구를 사용할 수 있습니다. AWS 자체 서비스로는 CloudWatch Logs Insights, Amazon Athena, Amazon OpenSearch Service 등이 있습니다. 서드파티 도구로는 Splunk, ELK Stack(Elasticsearch, Logstash, Kibana), Datadog 등이 인기가 있습니다.',
+                                        timestamp: now,
+                                    },
+                                ],
+                                createdAt: now,
+                                updatedAt: now,
+                            },
+                        ];
+                    }
+                }
             } finally {
                 this.loading = false;
             }
         },
 
         // 새 채팅 세션 생성
-        createNewSession() {
-            const now = new Date().toISOString();
-            const newSession: ChatSession = {
-                id: generateId(),
-                title: '새 대화',
-                messages: [],
-                createdAt: now,
-                updatedAt: now,
-            };
+        async createNewSession() {
+            try {
+                const authStore = useAuthStore();
+                const apiUrl = import.meta.env.VITE_API_URL || '/api';
+                const now = new Date().toISOString();
 
-            this.sessions.unshift(newSession);
-            this.currentSession = newSession;
+                // 로그인 여부 확인
+                if (!authStore.isAuthenticated) {
+                    // 개발 환경에서는 로컬 데이터 사용
+                    if (import.meta.env.DEV) {
+                        const newSession: ChatSession = {
+                            id: generateId(),
+                            title: '새 대화',
+                            messages: [],
+                            createdAt: now,
+                            updatedAt: now,
+                        };
 
-            return newSession;
+                        this.sessions.unshift(newSession);
+                        this.currentSession = newSession;
+
+                        return newSession;
+                    }
+
+                    throw new Error('로그인이 필요합니다.');
+                }
+
+                // API 호출을 통해 새 세션 생성
+                const response = await axios.post(
+                    `${apiUrl}/sessions`,
+                    {
+                        userId: authStore.user?.sub || authStore.user?.id,
+                        title: '새 대화',
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${authStore.tokens.idToken}`,
+                        },
+                    },
+                );
+
+                if (response.data) {
+                    const newSession: ChatSession = {
+                        id: response.data.sessionId,
+                        title: response.data.title,
+                        messages: [],
+                        createdAt: response.data.createdAt,
+                        updatedAt: response.data.updatedAt,
+                    };
+
+                    this.sessions.unshift(newSession);
+                    this.currentSession = newSession;
+
+                    return newSession;
+                }
+
+                throw new Error('새 세션 생성에 실패했습니다.');
+            } catch (err: any) {
+                console.error('새 세션 생성 오류:', err);
+                this.error = err.message || '새 세션을 생성하는 중 오류가 발생했습니다.';
+
+                // 오류 발생 시 로컬 세션 생성 (개발 환경)
+                if (import.meta.env.DEV) {
+                    const now = new Date().toISOString();
+                    const newSession: ChatSession = {
+                        id: generateId(),
+                        title: '새 대화',
+                        messages: [],
+                        createdAt: now,
+                        updatedAt: now,
+                    };
+
+                    this.sessions.unshift(newSession);
+                    this.currentSession = newSession;
+
+                    return newSession;
+                }
+
+                return null;
+            }
         },
 
         // 채팅 세션 선택
-        selectSession(sessionId: string) {
-            const session = this.sessions.find((s) => s.id === sessionId);
-            if (session) {
-                this.currentSession = session;
+        async selectSession(sessionId: string) {
+            try {
+                const authStore = useAuthStore();
+                const apiUrl = import.meta.env.VITE_API_URL || '/api';
+
+                // 로컬에서 세션 찾기
+                const localSession = this.sessions.find((s) => s.id === sessionId);
+                if (!localSession) {
+                    throw new Error('선택한 세션을 찾을 수 없습니다.');
+                }
+
+                // 개발 환경이거나 세션에 메시지가 이미 있으면 로컬 데이터 사용
+                if (
+                    import.meta.env.DEV ||
+                    (localSession.messages && localSession.messages.length > 0)
+                ) {
+                    this.currentSession = localSession;
+                    return;
+                }
+
+                // API 호출을 통해 세션 메시지 가져오기
+                const response = await axios.get(`${apiUrl}/sessions/${sessionId}/messages`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${authStore.tokens.idToken}`,
+                    },
+                });
+
+                if (response.data && response.data.messages) {
+                    // 응답에서 받은 메시지로 세션 업데이트
+                    localSession.messages = response.data.messages;
+                    this.currentSession = localSession;
+                } else {
+                    // 메시지가 없는 경우 빈 배열로 설정
+                    localSession.messages = [];
+                    this.currentSession = localSession;
+                }
+            } catch (err: any) {
+                console.error('세션 선택 오류:', err);
+                this.error = err.message || '세션을 선택하는 중 오류가 발생했습니다.';
+
+                // 오류 발생 시 로컬 세션 선택 (개발 환경)
+                if (import.meta.env.DEV) {
+                    const session = this.sessions.find((s) => s.id === sessionId);
+                    if (session) {
+                        this.currentSession = session;
+                    }
+                }
             }
         },
 
@@ -154,7 +291,7 @@ export const useChatbotStore = defineStore('chatbot', {
 
             // 현재 세션이 없으면 새 세션 생성
             if (!this.currentSession) {
-                this.createNewSession();
+                await this.createNewSession();
             }
 
             const now = new Date().toISOString();
@@ -173,9 +310,15 @@ export const useChatbotStore = defineStore('chatbot', {
 
             // 첫 메시지인 경우 세션 제목 업데이트
             if (this.currentSession!.messages.length === 1) {
-                this.currentSession!.title =
-                    text.length > 30 ? text.substring(0, 30) + '...' : text;
+                const title = text.length > 30 ? text.substring(0, 30) + '...' : text;
+                this.currentSession!.title = title;
+
+                // API를 통해 세션 제목 업데이트
+                this.updateSessionTitle(this.currentSession!.id, title);
             }
+
+            // API로 메시지 저장
+            this.saveMessage(this.currentSession!.id, userMessage);
 
             // 봇 응답 처리
             this.waitingForResponse = true;
@@ -213,6 +356,9 @@ export const useChatbotStore = defineStore('chatbot', {
                 this.currentSession!.messages.push(botMessage);
                 this.currentSession!.updatedAt = botMessage.timestamp;
 
+                // API로 봇 메시지 저장
+                this.saveMessage(this.currentSession!.id, botMessage);
+
                 // 타이핑 애니메이션
                 await this.simulateTyping(botMessage.id, botResponseText);
             } catch (err: any) {
@@ -229,8 +375,73 @@ export const useChatbotStore = defineStore('chatbot', {
 
                 this.currentSession!.messages.push(errorMessage);
                 this.currentSession!.updatedAt = errorMessage.timestamp;
+
+                // API로 오류 메시지 저장
+                this.saveMessage(this.currentSession!.id, errorMessage);
             } finally {
                 this.waitingForResponse = false;
+            }
+        },
+
+        // API를 통해 세션 제목 업데이트
+        async updateSessionTitle(sessionId: string, title: string) {
+            try {
+                const authStore = useAuthStore();
+                const apiUrl = import.meta.env.VITE_API_URL || '/api';
+
+                // 개발 환경에서는 API 호출 스킵
+                if (import.meta.env.DEV) {
+                    return;
+                }
+
+                // API 호출을 통해 세션 제목 업데이트
+                await axios.put(
+                    `${apiUrl}/sessions/${sessionId}`,
+                    {
+                        title: title,
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${authStore.tokens.idToken}`,
+                        },
+                    },
+                );
+            } catch (err) {
+                console.error('세션 제목 업데이트 오류:', err);
+                // 실패해도 UI에는 영향 없음
+            }
+        },
+
+        // API를 통해 메시지 저장
+        async saveMessage(sessionId: string, message: ChatMessage) {
+            try {
+                const authStore = useAuthStore();
+                const apiUrl = import.meta.env.VITE_API_URL || '/api';
+
+                // 개발 환경에서는 API 호출 스킵
+                if (import.meta.env.DEV) {
+                    return;
+                }
+
+                // API 호출을 통해 메시지 저장
+                await axios.post(
+                    `${apiUrl}/sessions/${sessionId}/messages`,
+                    {
+                        sender: message.sender,
+                        text: message.text,
+                        timestamp: message.timestamp,
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${authStore.tokens.idToken}`,
+                        },
+                    },
+                );
+            } catch (err) {
+                console.error('메시지 저장 오류:', err);
+                // 실패해도 UI에는 영향 없음
             }
         },
 
@@ -274,7 +485,7 @@ export const useChatbotStore = defineStore('chatbot', {
         async generateBotResponse(userMessage: string): Promise<string> {
             try {
                 // API URL 설정 - 환경변수나 설정에서 가져오는 것이 좋습니다
-                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                const apiUrl = import.meta.env.VITE_API_URL || '/api';
 
                 console.log('API 요청 전송:', userMessage);
 
@@ -302,12 +513,12 @@ export const useChatbotStore = defineStore('chatbot', {
                         console.log('배열 형태의 응답 변환 처리');
                         // rank_order로 정렬
                         const sortedItems = [...response.data.answer].sort(
-                            (a, b) => a.rank_order - b.rank_order,
+                            (a: RankItem, b: RankItem) => a.rank_order - b.rank_order,
                         );
 
                         // 배열을 문자열로 변환
                         return sortedItems
-                            .map((item) => `${item.context}\n${item.title}\n${item.url}`)
+                            .map((item: RankItem) => `${item.context}\n${item.title}\n${item.url}`)
                             .join('\n\n');
                     } else if (typeof response.data.answer === 'string') {
                         console.log('문자열 형태의 응답 처리');
@@ -331,20 +542,85 @@ export const useChatbotStore = defineStore('chatbot', {
         },
 
         // 채팅 세션 삭제
-        deleteSession(sessionId: string) {
-            this.sessions = this.sessions.filter((s) => s.id !== sessionId);
+        async deleteSession(sessionId: string) {
+            try {
+                const authStore = useAuthStore();
+                const apiUrl = import.meta.env.VITE_API_URL || '/api';
 
-            // 현재 선택된 세션이 삭제된 경우
-            if (this.currentSession && this.currentSession.id === sessionId) {
-                this.currentSession = this.sessions.length > 0 ? this.sessions[0] : null;
+                // 개발 환경이 아닌 경우 API 호출
+                if (!import.meta.env.DEV) {
+                    await axios.delete(`${apiUrl}/sessions/${sessionId}`, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${authStore.tokens.idToken}`,
+                        },
+                    });
+                }
+
+                // 로컬 상태 업데이트
+                this.sessions = this.sessions.filter((s) => s.id !== sessionId);
+
+                // 현재 선택된 세션이 삭제된 경우
+                if (this.currentSession && this.currentSession.id === sessionId) {
+                    this.currentSession = this.sessions.length > 0 ? this.sessions[0] : null;
+
+                    // 새 세션을 선택한 경우 해당 세션의 메시지 로드
+                    if (this.currentSession) {
+                        await this.selectSession(this.currentSession.id);
+                    }
+                }
+            } catch (err) {
+                console.error('세션 삭제 오류:', err);
+                this.error = '세션을 삭제하는 중 오류가 발생했습니다.';
             }
         },
 
         // 채팅 기록 클리어
-        clearMessages() {
+        async clearMessages() {
             if (this.currentSession) {
-                this.currentSession.messages = [];
-                this.currentSession.updatedAt = new Date().toISOString();
+                try {
+                    // 세션은 유지하고 메시지만 삭제
+                    const sessionId = this.currentSession.id;
+                    const title = this.currentSession.title;
+                    const createdAt = this.currentSession.createdAt;
+                    const updatedAt = new Date().toISOString();
+
+                    // 로컬 상태 업데이트
+                    this.currentSession.messages = [];
+                    this.currentSession.updatedAt = updatedAt;
+
+                    // 개발 환경이 아닌 경우 API 호출 (세션 업데이트)
+                    if (!import.meta.env.DEV) {
+                        const authStore = useAuthStore();
+                        const apiUrl = import.meta.env.VITE_API_URL || '/api';
+
+                        // 기존 세션 삭제 후 새 세션 생성
+                        await axios.delete(`${apiUrl}/sessions/${sessionId}`, {
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${authStore.tokens.idToken}`,
+                            },
+                        });
+
+                        // 동일한 ID로 새 세션 생성
+                        await axios.post(
+                            `${apiUrl}/sessions`,
+                            {
+                                userId: authStore.user?.sub || authStore.user?.id,
+                                title: title,
+                            },
+                            {
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    Authorization: `Bearer ${authStore.tokens.idToken}`,
+                                },
+                            },
+                        );
+                    }
+                } catch (err) {
+                    console.error('채팅 기록 클리어 오류:', err);
+                    this.error = '채팅 기록을 지우는 중 오류가 발생했습니다.';
+                }
             }
         },
 
