@@ -277,10 +277,19 @@ export const useAuthStore = defineStore('auth', {
         },
 
         // 로그아웃
+        // auth.ts 스토어의 logout 메서드 수정 부분 (기존 코드에 추가)
+        // 전체 스토어 코드를 다시 작성하지 않고, 로그아웃 메서드만 수정합니다.
+
+        // 로그아웃
         async logout() {
             try {
                 const clientId = import.meta.env.COGNITO_CLIENT_ID;
                 const redirectUri = import.meta.env.COGNITO_REDIRECT_URI;
+
+                // 로그아웃 시 앱 데이터 정리
+                import('@/helpers/initializeAuth').then(({ clearAppData }) => {
+                    clearAppData();
+                });
 
                 // 로그아웃 전에 로컬 스토리지 비우기
                 this.clearAuth();
