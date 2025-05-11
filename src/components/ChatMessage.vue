@@ -13,7 +13,7 @@
                 <span>{{ getUserInitial() }}</span>
             </div>
             <div v-else class="avatar bot-avatar">
-                <img src="@/assets/bot-avatar.svg" alt="Bot" />
+                <img src="@/assets/agent-logo.png" alt="Bot" />
             </div>
         </div>
 
