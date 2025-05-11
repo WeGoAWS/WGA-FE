@@ -183,7 +183,7 @@
                 sessionStorage.setItem('pendingQuestion', messageText.value);
 
                 // 챗봇 페이지로 이동
-                router.push('/chatbot');
+                router.push('/chat');
             };
 
             const askExampleQuestion = (question: string) => {
@@ -202,7 +202,7 @@
                 router.push('/chat');
             };
 
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            const apiUrl = import.meta.env.VITE_API_DEST || 'http://localhost:8000';
 
             const getHealth = () => {
                 axios.get(`${apiUrl}/health`, {
