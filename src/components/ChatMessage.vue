@@ -206,13 +206,13 @@
     .user-message .message-content {
         background-color: #e3f2fd;
         color: #0d47a1;
-        border-bottom-left-radius: 4px;
+        border-top-left-radius: 4px;
     }
 
     .bot-message .message-content {
         background-color: #f5f5f5;
         color: #333;
-        border-bottom-left-radius: 4px;
+        border-top-left-radius: 4px;
     }
 
     .typing-indicator {
@@ -221,7 +221,7 @@
         padding: 12px 16px;
         background-color: #f5f5f5;
         border-radius: 18px;
-        border-bottom-left-radius: 4px;
+        border-top-left-radius: 4px;
         gap: 4px;
         height: 44px;
     }
