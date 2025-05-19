@@ -170,8 +170,13 @@
             // 컴포넌트 마운트 시 세션 로드 및 초기화
             onMounted(async () => {
                 try {
-                    // 세션스토리지에서 질문 가져오기
+                    // 세션스토리지에서 질문과 새 세션 생성 플래그 가져오기
                     const pendingQuestion = sessionStorage.getItem('pendingQuestion');
+                    const shouldCreateNewSession =
+                        sessionStorage.getItem('createNewSession') === 'true';
+
+                    // 플래그 사용 후 제거
+                    sessionStorage.removeItem('createNewSession');
 
                     // 보류 중인 질문이 있는 경우 즉시 UI에 표시
                     if (pendingQuestion && !pendingQuestionProcessed.value) {
@@ -182,7 +187,7 @@
                         const tempMsgId = 'temp-' + Date.now().toString(36);
 
                         // 세션 생성 여부와 관계없이 사용자 메시지를 UI에 즉시 추가
-                        if (!store.currentSession) {
+                        if (!store.currentSession || shouldCreateNewSession) {
                             // 세션이 없으면 임시 세션 객체 생성
                             const newSession: ChatSession = {
                                 sessionId: 'temp-session-' + Date.now().toString(36),
@@ -232,7 +237,7 @@
                         // 백그라운드로 세션 작업 시작
                         Promise.all([
                             // 세션 로드 (필요한 경우)
-                            store.sessions.length === 0
+                            store.sessions.length === 0 && !shouldCreateNewSession
                                 ? store
                                       .fetchSessions()
                                       .catch((e) => console.error('세션 로드 오류:', e))
@@ -241,9 +246,14 @@
                             // 세션 생성 또는 선택 (필요한 경우)
                             (async () => {
                                 try {
-                                    if (store.sessions.length > 0) {
+                                    if (shouldCreateNewSession) {
+                                        // 새 세션 생성 플래그가 있으면 항상 새 세션 생성
+                                        await store.createNewSession();
+                                    } else if (store.sessions.length > 0) {
+                                        // 그렇지 않고 세션이 있으면 첫 번째 세션 선택
                                         await store.selectSession(store.sessions[0].sessionId);
                                     } else {
+                                        // 세션이 없으면 새 세션 생성
                                         await store.createNewSession();
                                     }
                                 } catch (e) {
@@ -260,26 +270,35 @@
                     } else {
                         // 보류 중인 질문이 없는 경우 일반적인 세션 초기화
                         // 세션 로드
-                        if (store.sessions.length === 0) {
+                        if (shouldCreateNewSession) {
+                            // 플래그가 있으면 항상 새 세션 생성
                             await store
-                                .fetchSessions()
-                                .catch((e) => console.error('세션 로드 오류:', e));
-                        }
-
-                        // 세션 선택 또는 생성
-                        if (!store.currentSession) {
-                            if (store.sessions.length > 0) {
+                                .createNewSession()
+                                .catch((e) => console.error('세션 생성 오류:', e));
+                        } else {
+                            // 플래그가 없으면 기존 로직 수행
+                            // 세션 로드
+                            if (store.sessions.length === 0) {
                                 await store
-                                    .selectSession(store.sessions[0].sessionId)
-                                    .catch((e) => console.error('세션 선택 오류:', e));
-                            } else {
-                                await store
-                                    .createNewSession()
-                                    .catch((e) => console.error('세션 생성 오류:', e));
+                                    .fetchSessions()
+                                    .catch((e) => console.error('세션 로드 오류:', e));
                             }
-                        } else if (!store.currentSession.messages) {
-                            // messages가 없는 경우에 대비해 빈 배열로 초기화
-                            store.currentSession.messages = [];
+
+                            // 세션 선택 또는 생성
+                            if (!store.currentSession) {
+                                if (store.sessions.length > 0) {
+                                    await store
+                                        .selectSession(store.sessions[0].sessionId)
+                                        .catch((e) => console.error('세션 선택 오류:', e));
+                                } else {
+                                    await store
+                                        .createNewSession()
+                                        .catch((e) => console.error('세션 생성 오류:', e));
+                                }
+                            } else if (!store.currentSession.messages) {
+                                // messages가 없는 경우에 대비해 빈 배열로 초기화
+                                store.currentSession.messages = [];
+                            }
                         }
                     }
 
@@ -317,7 +336,7 @@
                     const messageId = 'msg-' + Date.now().toString(36);
 
                     // 세션이 아직 없으면 임시 세션 생성
-                    if (!store.currentSession) {
+                    if (!store.currentSession || shouldCreateNewSession) {
                         const newSession: ChatSession = {
                             sessionId: 'temp-session-' + Date.now().toString(36),
                             userId: localStorage.getItem('userId') || 'temp-user',
