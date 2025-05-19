@@ -1,10 +1,12 @@
-<!-- src/views/EnhancedChatbotPage.vue -->
 <template>
     <AppLayout>
         <div class="chatbot-container">
             <!-- 좌측 사이드바 (채팅 세션 목록) -->
-            <div class="chatbot-sidebar">
-                <ChatHistory />
+            <div class="chatbot-sidebar" :class="{ 'disabled-sidebar': store.waitingForResponse }">
+                <ChatHistory
+                    :disabled="store.waitingForResponse"
+                    @session-click="handleSessionClick"
+                />
             </div>
 
             <!-- 메인 채팅 영역 -->
@@ -12,12 +14,34 @@
                 <div class="chat-header">
                     <h1 @click="handleGoMain">AWS Cloud Agent</h1>
                     <p class="chat-description">운영 정보/메뉴얼 질의</p>
+                    <!-- 진행 중인 질의가 있을 때 상태 표시 -->
+                    <div v-if="store.waitingForResponse" class="processing-indicator">
+                        <div class="processing-spinner"></div>
+                        <span>질의 처리 중...</span>
+                    </div>
                 </div>
 
                 <!-- 오류 메시지 표시 영역 -->
                 <div v-if="store.error" class="error-message">
                     {{ store.error }}
                     <button @click="dismissError" class="dismiss-error">×</button>
+                </div>
+
+                <!-- 세션 전환 시도 경고 모달 -->
+                <div v-if="showSessionChangeWarning" class="session-warning-modal">
+                    <div class="session-warning-content">
+                        <h3>⚠️ 주의</h3>
+                        <p>
+                            현재 질의가 처리 중입니다. 다른 세션으로 전환하면 현재 진행 중인 질의가
+                            중단됩니다.
+                        </p>
+                        <div class="warning-actions">
+                            <button @click="cancelSessionChange" class="cancel-button">취소</button>
+                            <button @click="confirmSessionChange" class="warning-confirm-button">
+                                전환
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 채팅 메시지 표시 영역 -->
@@ -47,6 +71,7 @@
                                         )
                                     "
                                     class="example-question"
+                                    :disabled="store.waitingForResponse"
                                 >
                                     최근 24시간 동안 보안 이벤트가 있었나요?
                                 </button>
@@ -57,6 +82,7 @@
                                         )
                                     "
                                     class="example-question"
+                                    :disabled="store.waitingForResponse"
                                 >
                                     지난 주 CPU 사용률이 가장 높았던 EC2 인스턴스는?
                                 </button>
@@ -67,6 +93,7 @@
                                         )
                                     "
                                     class="example-question"
+                                    :disabled="store.waitingForResponse"
                                 >
                                     비용 최적화를 위한 추천사항을 알려주세요.
                                 </button>
@@ -75,6 +102,7 @@
                                         askExampleQuestion('IAM 정책 관리 모범 사례는 무엇인가요?')
                                     "
                                     class="example-question"
+                                    :disabled="store.waitingForResponse"
                                 >
                                     IAM 정책 관리 모범 사례는 무엇인가요?
                                 </button>
@@ -85,27 +113,19 @@
 
                 <!-- 채팅 입력 영역 -->
                 <div class="input-container">
-                    <ChatInput
-                        :disabled="store.waitingForResponse"
-                        @send="sendMessage"
-                        @cancel="cancelRequest"
-                    />
+                    <ChatInput :disabled="store.waitingForResponse" @send="sendMessage" />
                 </div>
-
-                <!-- ESC 키 눌림 감지를 위한 키보드 이벤트 리스너 -->
-                <div
-                    class="keyboard-listener"
-                    tabindex="0"
-                    ref="keyboardListener"
-                    @keydown.esc="cancelRequest"
-                ></div>
 
                 <!-- 채팅 관련 추가 액션 버튼들 -->
                 <div
                     class="chat-actions"
                     v-if="store.currentSession && store.currentMessages.length > 0"
                 >
-                    <button @click="clearChat" class="clear-button">
+                    <button
+                        @click="clearChat"
+                        class="clear-button"
+                        :disabled="store.waitingForResponse"
+                    >
                         <span class="action-icon">🧹</span>
                         대화 내용 지우기
                     </button>
@@ -142,7 +162,10 @@
             const messagesContainer = ref<HTMLElement | null>(null);
             const initialSetupDone = ref(false);
             const pendingQuestionProcessed = ref(false);
-            const keyboardListener = ref<HTMLElement | null>(null);
+
+            // 세션 전환 관련 상태
+            const showSessionChangeWarning = ref(false);
+            const targetSessionId = ref<string | null>(null);
 
             // 컴포넌트 마운트 시 세션 로드 및 초기화
             onMounted(async () => {
@@ -262,13 +285,6 @@
 
                     // 이미 초기화가 완료되었는지 확인 (중복 실행 방지)
                     initialSetupDone.value = true;
-
-                    // keyboardListener에 포커스 설정
-                    nextTick(() => {
-                        if (keyboardListener.value) {
-                            keyboardListener.value.focus();
-                        }
-                    });
                 } catch (error) {
                     console.error('채팅 페이지 초기화 오류:', error);
                     store.error = '채팅 세션을 불러오는 중 오류가 발생했습니다.';
@@ -356,44 +372,64 @@
                     await sessionPromise;
 
                     try {
-                        // 메시지 전송 및 봇 응답 가져오기
-                        await store.sendMessage(text);
+                        // API 호출로 봇 응답 가져오기
+                        const botResponseText = await generateBotResponse(text);
 
-                        // 스크롤 조정
-                        await nextTick();
-                        scrollToBottom();
-                    } catch (responseError) {
-                        // 취소된 요청은 특별히 처리하지 않음 (store 내부에서 처리됨)
-                        if (!axios.isCancel(responseError)) {
-                            console.error('봇 응답 가져오기 오류:', responseError);
+                        // 현재 세션과 메시지 배열이 존재하는지 확인
+                        if (store.currentSession && Array.isArray(store.currentSession.messages)) {
+                            // 로딩 메시지 제거
+                            store.currentSession.messages = store.currentSession.messages.filter(
+                                (msg) => msg.id !== loadingId,
+                            );
+
+                            // 실제 봇 메시지 추가
+                            const botMessage: ChatMessageType = {
+                                id: 'bot-' + Date.now().toString(36),
+                                sender: 'bot',
+                                text: botResponseText,
+                                displayText: '', // 초기에는 빈 문자열로 시작
+                                timestamp: new Date().toISOString(),
+                                animationState: 'typing',
+                            };
+
+                            store.currentSession.messages.push(botMessage);
+
+                            // 타이핑 애니메이션
+                            await simulateTyping(botMessage.id, botResponseText);
                         }
+                    } catch (responseError) {
+                        console.error('봇 응답 가져오기 오류:', responseError);
 
-                        // 스크롤 조정
-                        await nextTick();
-                        scrollToBottom();
+                        // 현재 세션과 메시지 배열이 존재하는지 확인
+                        if (store.currentSession && Array.isArray(store.currentSession.messages)) {
+                            // 로딩 메시지 제거
+                            store.currentSession.messages = store.currentSession.messages.filter(
+                                (msg) => msg.id !== loadingId,
+                            );
+
+                            // 오류 메시지 추가
+                            const errorMessage: ChatMessageType = {
+                                id: 'error-' + Date.now().toString(36),
+                                sender: 'bot',
+                                text: '죄송합니다. 응답을 처리하는 중에 오류가 발생했습니다. 다시 시도해 주세요.',
+                                timestamp: new Date().toISOString(),
+                                animationState: 'appear',
+                            };
+
+                            store.currentSession.messages.push(errorMessage);
+                        }
                     }
+
+                    // 대화 상태 업데이트
+                    store.waitingForResponse = false;
+
+                    // 스크롤 조정
+                    await nextTick();
+                    scrollToBottom();
                 } catch (error) {
                     console.error('메시지 전송 중 오류 발생:', error);
                     store.error = '메시지를 전송하는 중 오류가 발생했습니다.';
-                }
-            };
-
-            // 요청 취소 처리
-            const cancelRequest = () => {
-                if (store.waitingForResponse) {
-                    console.log('사용자가 ESC 키를 눌러 요청을 취소했습니다.');
-                    store.cancelRequest();
-
-                    // 취소 알림 표시 (토스트 메시지 등으로 대체 가능)
-                    const toast = document.createElement('div');
-                    toast.className = 'cancel-toast';
-                    toast.textContent = '요청이 취소되었습니다.';
-                    document.body.appendChild(toast);
-
-                    // 3초 후 알림 제거
-                    setTimeout(() => {
-                        document.body.removeChild(toast);
-                    }, 3000);
+                    store.waitingForResponse = false;
                 }
             };
 
@@ -410,8 +446,135 @@
                 }
             };
 
+            // 세션 클릭 처리 (대기 중일 때 모달 표시)
+            const handleSessionClick = (sessionId: string) => {
+                if (store.waitingForResponse) {
+                    // 대기 중이면 경고 모달 표시
+                    targetSessionId.value = sessionId;
+                    showSessionChangeWarning.value = true;
+                } else {
+                    // 대기 중이 아니면 바로 세션 전환
+                    store.selectSession(sessionId);
+                }
+            };
+
+            // 세션 전환 취소
+            const cancelSessionChange = () => {
+                targetSessionId.value = null;
+                showSessionChangeWarning.value = false;
+            };
+
+            // 세션 전환 확인
+            const confirmSessionChange = async () => {
+                if (targetSessionId.value) {
+                    // 현재 응답 대기 상태 해제
+                    store.waitingForResponse = false;
+
+                    // 세션 전환
+                    await store.selectSession(targetSessionId.value);
+
+                    // 모달 닫기
+                    targetSessionId.value = null;
+                    showSessionChangeWarning.value = false;
+                }
+            };
+
+            // 봇 응답 생성 함수
+            const generateBotResponse = async (userMessage: string): Promise<string> => {
+                try {
+                    // API URL 설정
+                    const apiUrl = import.meta.env.VITE_API_DEST || 'http://localhost:8000';
+
+                    // API 호출
+                    const response = await axios.post(
+                        `${apiUrl}/llm1`,
+                        {
+                            text: userMessage,
+                            sessionId: store.currentSession?.sessionId,
+                        },
+                        {
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            withCredentials: true,
+                        },
+                    );
+
+                    // API 응답 처리 로직
+                    if (response.data) {
+                        // 응답이 배열 형태인지 확인
+                        if (Array.isArray(response.data.answer)) {
+                            // rank_order로 정렬
+                            const sortedItems = [...response.data.answer].sort(
+                                (a, b) => a.rank_order - b.rank_order,
+                            );
+
+                            // 배열을 문자열로 변환
+                            return sortedItems
+                                .map((item) => `${item.context}\n${item.title}\n${item.url}`)
+                                .join('\n\n');
+                        } else if (typeof response.data.answer === 'string') {
+                            return response.data.answer;
+                        } else {
+                            return JSON.stringify(response.data.answer);
+                        }
+                    }
+
+                    return '죄송합니다. 유효한 응답 데이터를 받지 못했습니다.';
+                } catch (error) {
+                    console.error('봇 응답 API 호출 오류:', error);
+                    throw error; // 오류를 상위로 전파하여 UI에서 처리
+                }
+            };
+
+            // 타이핑 애니메이션 시뮬레이션
+            const simulateTyping = async (messageId: string, fullText: string) => {
+                if (!store.currentSession || !Array.isArray(store.currentSession.messages)) return;
+
+                const message = store.currentSession.messages.find((m) => m.id === messageId);
+                if (!message) return;
+
+                const typingSpeed = 10; // 문자당 타이핑 시간 (밀리초)
+                const maxTypingTime = 2000; // 최대 타이핑 시간 (밀리초)
+
+                // 최대 타이핑 시간에 맞춰 속도 조절
+                const totalTypingTime = Math.min(fullText.length * typingSpeed, maxTypingTime);
+                const charInterval = totalTypingTime / fullText.length;
+
+                message.displayText = '';
+
+                for (let i = 0; i < fullText.length; i++) {
+                    await new Promise((resolve) => setTimeout(resolve, charInterval));
+
+                    // 메시지가 여전히 존재하는지 확인
+                    if (!store.currentSession || !Array.isArray(store.currentSession.messages)) {
+                        return;
+                    }
+
+                    const updatedMessage = store.currentSession.messages.find(
+                        (m) => m.id === messageId,
+                    );
+                    if (!updatedMessage) return;
+
+                    // 다음 글자 추가
+                    updatedMessage.displayText = fullText.substring(0, i + 1);
+                }
+
+                // 애니메이션 완료 상태로 변경
+                if (!store.currentSession || !Array.isArray(store.currentSession.messages)) return;
+
+                const completedMessage = store.currentSession.messages.find(
+                    (m) => m.id === messageId,
+                );
+                if (completedMessage) {
+                    completedMessage.animationState = 'complete';
+                }
+            };
+
             // 대화 내용 지우기
             const clearChat = async () => {
+                if (store.waitingForResponse) return; // 대기 중이면 중단
+
                 if (confirm('대화 내용을 모두 지우시겠습니까?')) {
                     try {
                         await store.clearMessages();
@@ -429,20 +592,32 @@
 
             // 메인 페이지로 이동
             const handleGoMain = () => {
-                router.push('/start-chat');
+                if (store.waitingForResponse) {
+                    if (
+                        confirm('질의 처리가 진행 중입니다. 정말 메인 페이지로 이동하시겠습니까?')
+                    ) {
+                        router.push('/start-chat');
+                    }
+                } else {
+                    router.push('/start-chat');
+                }
             };
 
             return {
                 store,
                 messagesContainer,
-                keyboardListener,
                 sendMessage,
                 askExampleQuestion,
                 clearChat,
                 dismissError,
                 handleGoMain,
-                cancelRequest,
-                scrollToBottom,
+                generateBotResponse,
+                simulateTyping,
+                showSessionChangeWarning,
+                targetSessionId,
+                handleSessionClick,
+                cancelSessionChange,
+                confirmSessionChange,
             };
         },
     });
@@ -464,6 +639,25 @@
         flex-direction: column;
         overflow: hidden;
         box-shadow: 2px 0 5px rgba(0, 0, 0, 0.03);
+        transition: opacity 0.3s;
+    }
+
+    /* 사이드바 비활성화 스타일 */
+    .disabled-sidebar {
+        position: relative;
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    .disabled-sidebar::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255, 255, 255, 0.3);
+        z-index: 10;
     }
 
     .chatbot-main {
@@ -476,19 +670,59 @@
         overflow: hidden;
     }
 
-    /* 키보드 리스너를 위한 스타일 (보이지 않게 설정) */
-    .keyboard-listener {
-        position: absolute;
-        opacity: 0;
-        width: 0;
-        height: 0;
-        pointer-events: none;
-    }
-
     .chat-header {
         margin-bottom: 20px;
         padding-bottom: 15px;
         border-bottom: 1px solid #e5e5e5;
+        position: relative;
+    }
+
+    /* 처리 중 인디케이터 스타일 */
+    .processing-indicator {
+        position: absolute;
+        top: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        background-color: #fff8e1;
+        border: 1px solid #ffd54f;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        color: #f57c00;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+        }
+        70% {
+            box-shadow: 0 0 0 6px rgba(255, 193, 7, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+        }
+    }
+
+    .processing-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(245, 124, 0, 0.2);
+        border-top: 2px solid #f57c00;
+        border-radius: 50%;
+        margin-right: 8px;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
     }
 
     .chat-header h1 {
@@ -527,6 +761,67 @@
         cursor: pointer;
         color: #721c24;
         padding: 0 5px;
+    }
+
+    /* 세션 전환 경고 모달 스타일 */
+    .session-warning-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .session-warning-content {
+        background-color: white;
+        padding: 24px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .session-warning-content h3 {
+        margin-top: 0;
+        margin-bottom: 16px;
+        color: #f57c00;
+    }
+
+    .warning-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    .cancel-button {
+        padding: 8px 16px;
+        background-color: #f0f0f0;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    .warning-confirm-button {
+        padding: 8px 16px;
+        background-color: #f57c00;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    .cancel-button:hover {
+        background-color: #e0e0e0;
+    }
+
+    .warning-confirm-button:hover {
+        background-color: #ef6c00;
     }
 
     .chat-messages {
@@ -591,11 +886,18 @@
         font-size: 0.95rem;
     }
 
-    .example-question:hover {
+    .example-question:hover:not(:disabled) {
         background-color: #e1f0ff;
         border-color: #99caff;
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .example-question:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
     }
 
     .input-container {
@@ -623,48 +925,18 @@
         transition: all 0.2s;
     }
 
-    .clear-button:hover {
+    .clear-button:hover:not(:disabled) {
         background-color: #f8f9fa;
         color: #495057;
     }
 
+    .clear-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
     .action-icon {
         font-size: 1rem;
-    }
-
-    /* 토스트 메시지 스타일 */
-    .cancel-toast {
-        position: fixed;
-        bottom: 30px;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: #333;
-        color: #fff;
-        padding: 12px 24px;
-        border-radius: 6px;
-        z-index: 1000;
-        font-size: 0.9rem;
-        animation: fadeInOut 3s ease-in-out;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-
-    @keyframes fadeInOut {
-        0% {
-            opacity: 0;
-            bottom: 20px;
-        }
-        15% {
-            opacity: 1;
-            bottom: 30px;
-        }
-        85% {
-            opacity: 1;
-            bottom: 30px;
-        }
-        100% {
-            opacity: 0;
-            bottom: 20px;
-        }
     }
 
     /* 반응형 스타일 */
