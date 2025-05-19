@@ -1,4 +1,4 @@
-// src/views/EnhancedChatbotPage.vue
+<!-- src/views/EnhancedChatbotPage.vue -->
 <template>
     <AppLayout>
         <div class="chatbot-container">
@@ -85,8 +85,20 @@
 
                 <!-- 채팅 입력 영역 -->
                 <div class="input-container">
-                    <ChatInput :disabled="store.waitingForResponse" @send="sendMessage" />
+                    <ChatInput
+                        :disabled="store.waitingForResponse"
+                        @send="sendMessage"
+                        @cancel="cancelRequest"
+                    />
                 </div>
+
+                <!-- ESC 키 눌림 감지를 위한 키보드 이벤트 리스너 -->
+                <div
+                    class="keyboard-listener"
+                    tabindex="0"
+                    ref="keyboardListener"
+                    @keydown.esc="cancelRequest"
+                ></div>
 
                 <!-- 채팅 관련 추가 액션 버튼들 -->
                 <div
@@ -130,72 +142,133 @@
             const messagesContainer = ref<HTMLElement | null>(null);
             const initialSetupDone = ref(false);
             const pendingQuestionProcessed = ref(false);
+            const keyboardListener = ref<HTMLElement | null>(null);
 
             // 컴포넌트 마운트 시 세션 로드 및 초기화
             onMounted(async () => {
                 try {
-                    // 세션스토리지에서 질문과 새 세션 생성 플래그 가져오기
+                    // 세션스토리지에서 질문 가져오기
                     const pendingQuestion = sessionStorage.getItem('pendingQuestion');
-                    const shouldCreateNewSession =
-                        sessionStorage.getItem('createNewSession') === 'true';
 
-                    // 세션 로드 (기존 세션 목록을 가져오기 위해)
-                    if (store.sessions.length === 0) {
-                        await store
-                            .fetchSessions()
-                            .catch((e) => console.error('세션 로드 오류:', e));
-                    }
-
-                    // 보류 중인 질문이 있고 새 세션을 생성해야 하는 경우
-                    if (pendingQuestion && shouldCreateNewSession) {
-                        pendingQuestionProcessed.value = true;
-                        sessionStorage.removeItem('pendingQuestion');
-                        sessionStorage.removeItem('createNewSession');
-
-                        // 먼저 새 세션 생성
-                        try {
-                            const newSession = await store.createNewSession();
-                            if (newSession) {
-                                // 세션 생성 성공 후 메시지 전송
-                                await store.sendMessage(pendingQuestion);
-                                scrollToBottom();
-                            }
-                        } catch (e) {
-                            console.error('새 세션 생성 및 메시지 전송 오류:', e);
-                        }
-                    }
-                    // 보류 중인 질문이 있지만 새 세션을 생성하지 않아도 되는 경우
-                    else if (pendingQuestion) {
+                    // 보류 중인 질문이 있는 경우 즉시 UI에 표시
+                    if (pendingQuestion && !pendingQuestionProcessed.value) {
                         pendingQuestionProcessed.value = true;
                         sessionStorage.removeItem('pendingQuestion');
 
-                        // 세션이 없으면 첫 번째 세션 선택 또는 새 세션 생성
+                        // 임시 메시지 ID 생성
+                        const tempMsgId = 'temp-' + Date.now().toString(36);
+
+                        // 세션 생성 여부와 관계없이 사용자 메시지를 UI에 즉시 추가
                         if (!store.currentSession) {
-                            if (store.sessions.length > 0) {
-                                await store.selectSession(store.sessions[0].sessionId);
-                            } else {
-                                await store.createNewSession();
-                            }
+                            // 세션이 없으면 임시 세션 객체 생성
+                            const newSession: ChatSession = {
+                                sessionId: 'temp-session-' + Date.now().toString(36),
+                                userId: localStorage.getItem('userId') || 'temp-user',
+                                title:
+                                    pendingQuestion.length > 30
+                                        ? pendingQuestion.substring(0, 30) + '...'
+                                        : pendingQuestion,
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString(),
+                                messages: [], // 빈 메시지 배열로 초기화
+                            };
+                            store.currentSession = newSession;
+                        } else if (!store.currentSession.messages) {
+                            // messages가 없는 경우에 대비해 빈 배열로 초기화
+                            store.currentSession.messages = [];
                         }
 
-                        // 메시지 전송
-                        await store.sendMessage(pendingQuestion);
-                        scrollToBottom();
-                    }
-                    // 보류 중인 질문이 없는 경우 일반적인 세션 초기화
-                    else {
+                        // 사용자 메시지 UI에 추가
+                        const userMessage: ChatMessageType = {
+                            id: tempMsgId,
+                            sender: 'user',
+                            text: pendingQuestion,
+                            timestamp: new Date().toISOString(),
+                            animationState: 'appear',
+                        };
+
+                        store.currentSession.messages.push(userMessage);
+
+                        // 로딩 메시지 즉시 추가
+                        const loadingMessage: ChatMessageType = {
+                            id: 'loading-' + Date.now().toString(36),
+                            sender: 'bot',
+                            text: '...',
+                            timestamp: new Date().toISOString(),
+                            isTyping: true,
+                        };
+
+                        store.currentSession.messages.push(loadingMessage);
+                        store.waitingForResponse = true;
+
+                        // UI 업데이트를 위한 nextTick 및 스크롤 조정
+                        nextTick(() => {
+                            scrollToBottom();
+                        });
+
+                        // 백그라운드로 세션 작업 시작
+                        Promise.all([
+                            // 세션 로드 (필요한 경우)
+                            store.sessions.length === 0
+                                ? store
+                                      .fetchSessions()
+                                      .catch((e) => console.error('세션 로드 오류:', e))
+                                : Promise.resolve(),
+
+                            // 세션 생성 또는 선택 (필요한 경우)
+                            (async () => {
+                                try {
+                                    if (store.sessions.length > 0) {
+                                        await store.selectSession(store.sessions[0].sessionId);
+                                    } else {
+                                        await store.createNewSession();
+                                    }
+                                } catch (e) {
+                                    console.error('세션 초기화 오류:', e);
+                                }
+                            })(),
+                        ]).then(() => {
+                            // 백그라운드에서 메시지 전송 (세션 생성/로드 이후)
+                            // 이 시점에서 이미 UI에는 메시지와 로딩이 표시됨
+                            store
+                                .sendMessage(pendingQuestion)
+                                .catch((e) => console.error('메시지 전송 오류:', e));
+                        });
+                    } else {
+                        // 보류 중인 질문이 없는 경우 일반적인 세션 초기화
+                        // 세션 로드
+                        if (store.sessions.length === 0) {
+                            await store
+                                .fetchSessions()
+                                .catch((e) => console.error('세션 로드 오류:', e));
+                        }
+
                         // 세션 선택 또는 생성
                         if (!store.currentSession) {
                             if (store.sessions.length > 0) {
-                                await store.selectSession(store.sessions[0].sessionId);
+                                await store
+                                    .selectSession(store.sessions[0].sessionId)
+                                    .catch((e) => console.error('세션 선택 오류:', e));
                             } else {
-                                await store.createNewSession();
+                                await store
+                                    .createNewSession()
+                                    .catch((e) => console.error('세션 생성 오류:', e));
                             }
+                        } else if (!store.currentSession.messages) {
+                            // messages가 없는 경우에 대비해 빈 배열로 초기화
+                            store.currentSession.messages = [];
                         }
                     }
 
                     // 이미 초기화가 완료되었는지 확인 (중복 실행 방지)
                     initialSetupDone.value = true;
+
+                    // keyboardListener에 포커스 설정
+                    nextTick(() => {
+                        if (keyboardListener.value) {
+                            keyboardListener.value.focus();
+                        }
+                    });
                 } catch (error) {
                     console.error('채팅 페이지 초기화 오류:', error);
                     store.error = '채팅 세션을 불러오는 중 오류가 발생했습니다.';
@@ -227,7 +300,7 @@
                     // 메시지 ID 생성
                     const messageId = 'msg-' + Date.now().toString(36);
 
-                    // 세션이 아직 없으면 새 세션 생성
+                    // 세션이 아직 없으면 임시 세션 생성
                     if (!store.currentSession) {
                         const newSession: ChatSession = {
                             sessionId: 'temp-session-' + Date.now().toString(36),
@@ -283,64 +356,44 @@
                     await sessionPromise;
 
                     try {
-                        // API 호출로 봇 응답 가져오기
-                        const botResponseText = await generateBotResponse(text);
+                        // 메시지 전송 및 봇 응답 가져오기
+                        await store.sendMessage(text);
 
-                        // 현재 세션과 메시지 배열이 존재하는지 확인
-                        if (store.currentSession && Array.isArray(store.currentSession.messages)) {
-                            // 로딩 메시지 제거
-                            store.currentSession.messages = store.currentSession.messages.filter(
-                                (msg) => msg.id !== loadingId,
-                            );
-
-                            // 실제 봇 메시지 추가
-                            const botMessage: ChatMessageType = {
-                                id: 'bot-' + Date.now().toString(36),
-                                sender: 'bot',
-                                text: botResponseText,
-                                displayText: '', // 초기에는 빈 문자열로 시작
-                                timestamp: new Date().toISOString(),
-                                animationState: 'typing',
-                            };
-
-                            store.currentSession.messages.push(botMessage);
-
-                            // 타이핑 애니메이션
-                            await simulateTyping(botMessage.id, botResponseText);
-                        }
+                        // 스크롤 조정
+                        await nextTick();
+                        scrollToBottom();
                     } catch (responseError) {
-                        console.error('봇 응답 가져오기 오류:', responseError);
-
-                        // 현재 세션과 메시지 배열이 존재하는지 확인
-                        if (store.currentSession && Array.isArray(store.currentSession.messages)) {
-                            // 로딩 메시지 제거
-                            store.currentSession.messages = store.currentSession.messages.filter(
-                                (msg) => msg.id !== loadingId,
-                            );
-
-                            // 오류 메시지 추가
-                            const errorMessage: ChatMessageType = {
-                                id: 'error-' + Date.now().toString(36),
-                                sender: 'bot',
-                                text: '죄송합니다. 응답을 처리하는 중에 오류가 발생했습니다. 다시 시도해 주세요.',
-                                timestamp: new Date().toISOString(),
-                                animationState: 'appear',
-                            };
-
-                            store.currentSession.messages.push(errorMessage);
+                        // 취소된 요청은 특별히 처리하지 않음 (store 내부에서 처리됨)
+                        if (!axios.isCancel(responseError)) {
+                            console.error('봇 응답 가져오기 오류:', responseError);
                         }
+
+                        // 스크롤 조정
+                        await nextTick();
+                        scrollToBottom();
                     }
-
-                    // 대화 상태 업데이트
-                    store.waitingForResponse = false;
-
-                    // 스크롤 조정
-                    await nextTick();
-                    scrollToBottom();
                 } catch (error) {
                     console.error('메시지 전송 중 오류 발생:', error);
                     store.error = '메시지를 전송하는 중 오류가 발생했습니다.';
-                    store.waitingForResponse = false;
+                }
+            };
+
+            // 요청 취소 처리
+            const cancelRequest = () => {
+                if (store.waitingForResponse) {
+                    console.log('사용자가 ESC 키를 눌러 요청을 취소했습니다.');
+                    store.cancelRequest();
+
+                    // 취소 알림 표시 (토스트 메시지 등으로 대체 가능)
+                    const toast = document.createElement('div');
+                    toast.className = 'cancel-toast';
+                    toast.textContent = '요청이 취소되었습니다.';
+                    document.body.appendChild(toast);
+
+                    // 3초 후 알림 제거
+                    setTimeout(() => {
+                        document.body.removeChild(toast);
+                    }, 3000);
                 }
             };
 
@@ -354,98 +407,6 @@
                 } catch (error) {
                     console.error('예시 질문 전송 오류:', error);
                     store.error = '메시지를 전송하는 중 오류가 발생했습니다.';
-                }
-            };
-
-            // 봇 응답 생성 함수
-            const generateBotResponse = async (userMessage: string): Promise<string> => {
-                try {
-                    // API URL 설정
-                    const apiUrl = import.meta.env.VITE_API_DEST || 'http://localhost:8000';
-
-                    // API 호출
-                    const response = await axios.post(
-                        `${apiUrl}/llm1`,
-                        {
-                            text: userMessage,
-                            sessionId: store.currentSession?.sessionId,
-                        },
-                        {
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            withCredentials: true,
-                        },
-                    );
-
-                    // API 응답 처리 로직
-                    if (response.data) {
-                        // 응답이 배열 형태인지 확인
-                        if (Array.isArray(response.data.answer)) {
-                            // rank_order로 정렬
-                            const sortedItems = [...response.data.answer].sort(
-                                (a, b) => a.rank_order - b.rank_order,
-                            );
-
-                            // 배열을 문자열로 변환
-                            return sortedItems
-                                .map((item) => `${item.context}\n${item.title}\n${item.url}`)
-                                .join('\n\n');
-                        } else if (typeof response.data.answer === 'string') {
-                            return response.data.answer;
-                        } else {
-                            return JSON.stringify(response.data.answer);
-                        }
-                    }
-
-                    return '죄송합니다. 유효한 응답 데이터를 받지 못했습니다.';
-                } catch (error) {
-                    console.error('봇 응답 API 호출 오류:', error);
-                    throw error; // 오류를 상위로 전파하여 UI에서 처리
-                }
-            };
-
-            // 타이핑 애니메이션 시뮬레이션
-            const simulateTyping = async (messageId: string, fullText: string) => {
-                if (!store.currentSession || !Array.isArray(store.currentSession.messages)) return;
-
-                const message = store.currentSession.messages.find((m) => m.id === messageId);
-                if (!message) return;
-
-                const typingSpeed = 10; // 문자당 타이핑 시간 (밀리초)
-                const maxTypingTime = 2000; // 최대 타이핑 시간 (밀리초)
-
-                // 최대 타이핑 시간에 맞춰 속도 조절
-                const totalTypingTime = Math.min(fullText.length * typingSpeed, maxTypingTime);
-                const charInterval = totalTypingTime / fullText.length;
-
-                message.displayText = '';
-
-                for (let i = 0; i < fullText.length; i++) {
-                    await new Promise((resolve) => setTimeout(resolve, charInterval));
-
-                    // 메시지가 여전히 존재하는지 확인
-                    if (!store.currentSession || !Array.isArray(store.currentSession.messages)) {
-                        return;
-                    }
-
-                    const updatedMessage = store.currentSession.messages.find(
-                        (m) => m.id === messageId,
-                    );
-                    if (!updatedMessage) return;
-
-                    // 다음 글자 추가
-                    updatedMessage.displayText = fullText.substring(0, i + 1);
-                }
-
-                // 애니메이션 완료 상태로 변경
-                if (!store.currentSession || !Array.isArray(store.currentSession.messages)) return;
-
-                const completedMessage = store.currentSession.messages.find(
-                    (m) => m.id === messageId,
-                );
-                if (completedMessage) {
-                    completedMessage.animationState = 'complete';
                 }
             };
 
@@ -474,13 +435,14 @@
             return {
                 store,
                 messagesContainer,
+                keyboardListener,
                 sendMessage,
                 askExampleQuestion,
                 clearChat,
                 dismissError,
                 handleGoMain,
-                generateBotResponse,
-                simulateTyping,
+                cancelRequest,
+                scrollToBottom,
             };
         },
     });
@@ -512,6 +474,15 @@
         position: relative;
         background-color: #f8f9fa;
         overflow: hidden;
+    }
+
+    /* 키보드 리스너를 위한 스타일 (보이지 않게 설정) */
+    .keyboard-listener {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+        pointer-events: none;
     }
 
     .chat-header {
@@ -659,6 +630,41 @@
 
     .action-icon {
         font-size: 1rem;
+    }
+
+    /* 토스트 메시지 스타일 */
+    .cancel-toast {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #333;
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 6px;
+        z-index: 1000;
+        font-size: 0.9rem;
+        animation: fadeInOut 3s ease-in-out;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    @keyframes fadeInOut {
+        0% {
+            opacity: 0;
+            bottom: 20px;
+        }
+        15% {
+            opacity: 1;
+            bottom: 30px;
+        }
+        85% {
+            opacity: 1;
+            bottom: 30px;
+        }
+        100% {
+            opacity: 0;
+            bottom: 20px;
+        }
     }
 
     /* 반응형 스타일 */
