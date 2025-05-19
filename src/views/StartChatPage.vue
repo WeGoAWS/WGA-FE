@@ -171,21 +171,19 @@
             const chatHistoryStore = useChatHistoryStore();
             const messageText = ref('');
 
-            // 새 대화 시작 함수 - 바로 페이지 이동 후 비동기로 세션 생성
+            // 새 대화 시작 함수 - 바로 페이지 이동 후 새 세션 생성
             const startNewChat = async () => {
                 if (!messageText.value.trim()) return;
 
                 try {
+                    // 새 세션을 만들어야 한다는 플래그 저장
+                    sessionStorage.setItem('createNewSession', 'true');
+
                     // 질문을 세션 스토리지에 저장
                     sessionStorage.setItem('pendingQuestion', messageText.value);
 
                     // 즉시 채팅 페이지로 이동
                     router.push('/chat');
-
-                    // 세션 생성은 백그라운드에서 처리 (이미 페이지를 이동했으므로 결과에 영향 없음)
-                    chatHistoryStore.createNewSession().catch((error) => {
-                        console.error('백그라운드 세션 생성 중 오류 발생:', error);
-                    });
                 } catch (error) {
                     console.error('새 대화 시작 중 오류 발생:', error);
                     alert('새 대화를 시작할 수 없습니다. 다시 시도해 주세요.');
@@ -200,20 +198,14 @@
 
             // 향상된 채팅 페이지로 이동하는 함수
             const goToEnhancedChat = async () => {
-                // 입력된 질문이 있다면 저장
+                // 입력된 질문이 있다면 저장 및 새 세션 플래그 설정
                 if (messageText.value.trim()) {
+                    sessionStorage.setItem('createNewSession', 'true');
                     sessionStorage.setItem('pendingQuestion', messageText.value);
                 }
 
                 // 즉시 채팅 페이지로 이동
                 router.push('/chat');
-
-                // 세션 생성은 백그라운드에서 처리
-                if (messageText.value.trim()) {
-                    chatHistoryStore.createNewSession().catch((error) => {
-                        console.error('백그라운드 세션 생성 중 오류 발생:', error);
-                    });
-                }
             };
 
             const apiUrl = import.meta.env.VITE_API_DEST || 'http://localhost:8000';

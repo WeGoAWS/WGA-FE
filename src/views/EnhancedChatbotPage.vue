@@ -1,7 +1,4 @@
-// 예시 질문 전송 const askExampleQuestion = async (question: string) => { if
-(store.waitingForResponse) return; // 이미 응답 대기 중이면 중단 try { // 즉시 예시 질문 전송 (세션
-생성 대기 없이) await sendMessage(question); } catch (error) { console.error('예시 질문 전송 오류:',
-error); store.error = '메시지를 전송하는 중 오류가 발생했습니다.'; } };
+// src/views/EnhancedChatbotPage.vue
 <template>
     <AppLayout>
         <div class="chatbot-container">
@@ -137,116 +134,63 @@ error); store.error = '메시지를 전송하는 중 오류가 발생했습니�
             // 컴포넌트 마운트 시 세션 로드 및 초기화
             onMounted(async () => {
                 try {
-                    // 세션스토리지에서 질문 가져오기
+                    // 세션스토리지에서 질문과 새 세션 생성 플래그 가져오기
                     const pendingQuestion = sessionStorage.getItem('pendingQuestion');
+                    const shouldCreateNewSession =
+                        sessionStorage.getItem('createNewSession') === 'true';
 
-                    // 보류 중인 질문이 있는 경우 즉시 UI에 표시
-                    if (pendingQuestion && !pendingQuestionProcessed.value) {
+                    // 세션 로드 (기존 세션 목록을 가져오기 위해)
+                    if (store.sessions.length === 0) {
+                        await store
+                            .fetchSessions()
+                            .catch((e) => console.error('세션 로드 오류:', e));
+                    }
+
+                    // 보류 중인 질문이 있고 새 세션을 생성해야 하는 경우
+                    if (pendingQuestion && shouldCreateNewSession) {
+                        pendingQuestionProcessed.value = true;
+                        sessionStorage.removeItem('pendingQuestion');
+                        sessionStorage.removeItem('createNewSession');
+
+                        // 먼저 새 세션 생성
+                        try {
+                            const newSession = await store.createNewSession();
+                            if (newSession) {
+                                // 세션 생성 성공 후 메시지 전송
+                                await store.sendMessage(pendingQuestion);
+                                scrollToBottom();
+                            }
+                        } catch (e) {
+                            console.error('새 세션 생성 및 메시지 전송 오류:', e);
+                        }
+                    }
+                    // 보류 중인 질문이 있지만 새 세션을 생성하지 않아도 되는 경우
+                    else if (pendingQuestion) {
                         pendingQuestionProcessed.value = true;
                         sessionStorage.removeItem('pendingQuestion');
 
-                        // 임시 메시지 ID 생성
-                        const tempMsgId = 'temp-' + Date.now().toString(36);
-
-                        // 세션 생성 여부와 관계없이 사용자 메시지를 UI에 즉시 추가
+                        // 세션이 없으면 첫 번째 세션 선택 또는 새 세션 생성
                         if (!store.currentSession) {
-                            // 세션이 없으면 임시 세션 객체 생성
-                            const newSession: ChatSession = {
-                                sessionId: 'temp-session-' + Date.now().toString(36),
-                                userId: localStorage.getItem('userId') || 'temp-user',
-                                title:
-                                    pendingQuestion.length > 30
-                                        ? pendingQuestion.substring(0, 30) + '...'
-                                        : pendingQuestion,
-                                createdAt: new Date().toISOString(),
-                                updatedAt: new Date().toISOString(),
-                                messages: [], // 빈 메시지 배열로 초기화
-                            };
-                            store.currentSession = newSession;
-                        } else if (!store.currentSession.messages) {
-                            // messages가 없는 경우에 대비해 빈 배열로 초기화
-                            store.currentSession.messages = [];
+                            if (store.sessions.length > 0) {
+                                await store.selectSession(store.sessions[0].sessionId);
+                            } else {
+                                await store.createNewSession();
+                            }
                         }
 
-                        // 사용자 메시지 UI에 추가
-                        const userMessage: ChatMessageType = {
-                            id: tempMsgId,
-                            sender: 'user',
-                            text: pendingQuestion,
-                            timestamp: new Date().toISOString(),
-                            animationState: 'appear',
-                        };
-
-                        store.currentSession.messages.push(userMessage);
-
-                        // 로딩 메시지 즉시 추가
-                        const loadingMessage: ChatMessageType = {
-                            id: 'loading-' + Date.now().toString(36),
-                            sender: 'bot',
-                            text: '...',
-                            timestamp: new Date().toISOString(),
-                            isTyping: true,
-                        };
-
-                        store.currentSession.messages.push(loadingMessage);
-                        store.waitingForResponse = true;
-
-                        // UI 업데이트를 위한 nextTick 및 스크롤 조정
-                        nextTick(() => {
-                            scrollToBottom();
-                        });
-
-                        // 백그라운드로 세션 작업 시작
-                        Promise.all([
-                            // 세션 로드 (필요한 경우)
-                            store.sessions.length === 0
-                                ? store
-                                      .fetchSessions()
-                                      .catch((e) => console.error('세션 로드 오류:', e))
-                                : Promise.resolve(),
-
-                            // 세션 생성 또는 선택 (필요한 경우)
-                            (async () => {
-                                try {
-                                    if (store.sessions.length > 0) {
-                                        await store.selectSession(store.sessions[0].sessionId);
-                                    } else {
-                                        await store.createNewSession();
-                                    }
-                                } catch (e) {
-                                    console.error('세션 초기화 오류:', e);
-                                }
-                            })(),
-                        ]).then(() => {
-                            // 백그라운드에서 메시지 전송 (세션 생성/로드 이후)
-                            // 이 시점에서 이미 UI에는 메시지와 로딩이 표시됨
-                            store
-                                .sendMessage(pendingQuestion)
-                                .catch((e) => console.error('메시지 전송 오류:', e));
-                        });
-                    } else {
-                        // 보류 중인 질문이 없는 경우 일반적인 세션 초기화
-                        // 세션 로드
-                        if (store.sessions.length === 0) {
-                            await store
-                                .fetchSessions()
-                                .catch((e) => console.error('세션 로드 오류:', e));
-                        }
-
+                        // 메시지 전송
+                        await store.sendMessage(pendingQuestion);
+                        scrollToBottom();
+                    }
+                    // 보류 중인 질문이 없는 경우 일반적인 세션 초기화
+                    else {
                         // 세션 선택 또는 생성
                         if (!store.currentSession) {
                             if (store.sessions.length > 0) {
-                                await store
-                                    .selectSession(store.sessions[0].sessionId)
-                                    .catch((e) => console.error('세션 선택 오류:', e));
+                                await store.selectSession(store.sessions[0].sessionId);
                             } else {
-                                await store
-                                    .createNewSession()
-                                    .catch((e) => console.error('세션 생성 오류:', e));
+                                await store.createNewSession();
                             }
-                        } else if (!store.currentSession.messages) {
-                            // messages가 없는 경우에 대비해 빈 배열로 초기화
-                            store.currentSession.messages = [];
                         }
                     }
 
@@ -283,7 +227,7 @@ error); store.error = '메시지를 전송하는 중 오류가 발생했습니�
                     // 메시지 ID 생성
                     const messageId = 'msg-' + Date.now().toString(36);
 
-                    // 세션이 아직 없으면 임시 세션 생성
+                    // 세션이 아직 없으면 새 세션 생성
                     if (!store.currentSession) {
                         const newSession: ChatSession = {
                             sessionId: 'temp-session-' + Date.now().toString(36),
