@@ -144,7 +144,7 @@
     import ChatMessage from '@/components/ChatMessage.vue';
     import ChatInput from '@/components/ChatInput.vue';
     import { useChatHistoryStore } from '@/stores/chatHistoryStore';
-    import type { ChatMessageType, ChatSession } from '@/types/chat';
+    import type { ChatMessageType } from '@/types/chat';
 
     export default defineComponent({
         name: 'EnhancedChatbotPage',
@@ -178,98 +178,37 @@
                     // 플래그 사용 후 제거
                     sessionStorage.removeItem('createNewSession');
 
-                    // 보류 중인 질문이 있는 경우 즉시 UI에 표시
+                    // 보류 중인 질문이 있는 경우
                     if (pendingQuestion && !pendingQuestionProcessed.value) {
                         pendingQuestionProcessed.value = true;
                         sessionStorage.removeItem('pendingQuestion');
 
-                        // 임시 메시지 ID 생성
-                        const tempMsgId = 'temp-' + Date.now().toString(36);
-
-                        // 세션 생성 여부와 관계없이 사용자 메시지를 UI에 즉시 추가
-                        if (!store.currentSession || shouldCreateNewSession) {
-                            // 세션이 없으면 임시 세션 객체 생성
-                            const newSession: ChatSession = {
-                                sessionId: 'temp-session-' + Date.now().toString(36),
-                                userId: localStorage.getItem('userId') || 'temp-user',
-                                title:
+                        // 세션 관련 작업 진행
+                        if (store.sessions.length === 0 || shouldCreateNewSession) {
+                            try {
+                                // 세션이 없거나 새 세션 요청인 경우 새 세션 생성
+                                await store.createNewSession(
                                     pendingQuestion.length > 30
                                         ? pendingQuestion.substring(0, 30) + '...'
                                         : pendingQuestion,
-                                createdAt: new Date().toISOString(),
-                                updatedAt: new Date().toISOString(),
-                                messages: [], // 빈 메시지 배열로 초기화
-                            };
-                            store.currentSession = newSession;
-                        } else if (!store.currentSession.messages) {
-                            // messages가 없는 경우에 대비해 빈 배열로 초기화
-                            store.currentSession.messages = [];
+                                );
+                            } catch (e) {
+                                console.error('세션 생성 오류:', e);
+                            }
+                        } else if (!store.currentSession) {
+                            // 세션 선택 필요
+                            try {
+                                await store.selectSession(store.sessions[0].sessionId);
+                            } catch (e) {
+                                console.error('세션 선택 오류:', e);
+                            }
                         }
 
-                        // 사용자 메시지 UI에 추가
-                        const userMessage: ChatMessageType = {
-                            id: tempMsgId,
-                            sender: 'user',
-                            text: pendingQuestion,
-                            timestamp: new Date().toISOString(),
-                            animationState: 'appear',
-                        };
-
-                        store.currentSession.messages.push(userMessage);
-
-                        // 로딩 메시지 즉시 추가
-                        const loadingMessage: ChatMessageType = {
-                            id: 'loading-' + Date.now().toString(36),
-                            sender: 'bot',
-                            text: '...',
-                            timestamp: new Date().toISOString(),
-                            isTyping: true,
-                        };
-
-                        store.currentSession.messages.push(loadingMessage);
-                        store.waitingForResponse = true;
-
-                        // UI 업데이트를 위한 nextTick 및 스크롤 조정
-                        nextTick(() => {
-                            scrollToBottom();
-                        });
-
-                        // 백그라운드로 세션 작업 시작
-                        Promise.all([
-                            // 세션 로드 (필요한 경우)
-                            store.sessions.length === 0 && !shouldCreateNewSession
-                                ? store
-                                      .fetchSessions()
-                                      .catch((e) => console.error('세션 로드 오류:', e))
-                                : Promise.resolve(),
-
-                            // 세션 생성 또는 선택 (필요한 경우)
-                            (async () => {
-                                try {
-                                    if (shouldCreateNewSession) {
-                                        // 새 세션 생성 플래그가 있으면 항상 새 세션 생성
-                                        await store.createNewSession();
-                                    } else if (store.sessions.length > 0) {
-                                        // 그렇지 않고 세션이 있으면 첫 번째 세션 선택
-                                        await store.selectSession(store.sessions[0].sessionId);
-                                    } else {
-                                        // 세션이 없으면 새 세션 생성
-                                        await store.createNewSession();
-                                    }
-                                } catch (e) {
-                                    console.error('세션 초기화 오류:', e);
-                                }
-                            })(),
-                        ]).then(() => {
-                            // 백그라운드에서 메시지 전송 (세션 생성/로드 이후)
-                            // 이 시점에서 이미 UI에는 메시지와 로딩이 표시됨
-                            store
-                                .sendMessage(pendingQuestion)
-                                .catch((e) => console.error('메시지 전송 오류:', e));
-                        });
+                        // 여기서 메시지 처리는 한 번만 수행
+                        // sendMessage 함수 호출로 통합 (자체 구현하지 않고)
+                        await sendMessage(pendingQuestion, true);
                     } else {
                         // 보류 중인 질문이 없는 경우 일반적인 세션 초기화
-                        // 세션 로드
                         if (shouldCreateNewSession) {
                             // 플래그가 있으면 항상 새 세션 생성
                             await store
@@ -328,30 +267,25 @@
             };
 
             // 메시지 전송 처리
-            const sendMessage = async (text: string) => {
+            const sendMessage = async (text: string, isPending = false) => {
                 if (!text.trim() || store.waitingForResponse) return;
 
                 try {
-                    // 메시지 ID 생성
-                    const messageId = 'msg-' + Date.now().toString(36);
-
-                    // 세션이 아직 없으면 임시 세션 생성
-                    if (!store.currentSession || shouldCreateNewSession) {
-                        const newSession: ChatSession = {
-                            sessionId: 'temp-session-' + Date.now().toString(36),
-                            userId: localStorage.getItem('userId') || 'temp-user',
-                            title: text.length > 30 ? text.substring(0, 30) + '...' : text,
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString(),
-                            messages: [], // 빈 배열로 초기화
-                        };
-                        store.currentSession = newSession;
+                    // 현재 세션 확인
+                    if (!store.currentSession) {
+                        // 세션이 없으면 새 세션 생성
+                        await store.createNewSession(
+                            text.length > 30 ? text.substring(0, 30) + '...' : text,
+                        );
                     } else if (!store.currentSession.messages) {
-                        // messages가 없는 경우에 빈 배열로 초기화
+                        // messages가 없는 경우 빈 배열로 초기화
                         store.currentSession.messages = [];
                     }
 
-                    // 먼저 사용자 메시지 UI에 즉시 표시
+                    // 메시지 ID 생성
+                    const messageId = 'msg-' + Date.now().toString(36);
+
+                    // 사용자 메시지 UI에 즉시 표시
                     const userMessage: ChatMessageType = {
                         id: messageId,
                         sender: 'user',
@@ -360,6 +294,7 @@
                         animationState: 'appear',
                     };
 
+                    // 메시지를 UI에 추가
                     store.currentSession.messages.push(userMessage);
 
                     // 로딩 메시지 즉시 추가
@@ -379,19 +314,8 @@
                     await nextTick();
                     scrollToBottom();
 
-                    // 백그라운드에서 세션 생성 (필요한 경우)
-                    let sessionPromise = Promise.resolve() as any;
-                    if (store.currentSession.sessionId.startsWith('temp-')) {
-                        sessionPromise = store.createNewSession().catch((e) => {
-                            console.error('메시지 전송 전 세션 생성 실패:', e);
-                        });
-                    }
-
-                    // 세션 생성 완료 후 실제 메시지 전송
-                    await sessionPromise;
-
                     try {
-                        // API 호출로 봇 응답 가져오기
+                        // 직접 API 호출하여 봇 응답 생성
                         const botResponseText = await generateBotResponse(text);
 
                         // 현재 세션과 메시지 배열이 존재하는지 확인
