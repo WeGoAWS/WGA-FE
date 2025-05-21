@@ -662,6 +662,32 @@
         bottom: 0;
         background-color: rgba(0, 0, 0, 0.5);
         z-index: 999;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .nav-overlay {
+        opacity: 1;
+    }
+
+    /* 애니메이션 트랜지션 스타일 추가 */
+    .slide-enter-active,
+    .slide-leave-active {
+        transition:
+            transform 0.3s ease,
+            opacity 0.3s ease;
+    }
+
+    .slide-enter-from,
+    .slide-leave-to {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+
+    .slide-enter-to,
+    .slide-leave-from {
+        transform: translateX(0);
+        opacity: 1;
     }
 
     /* 반응형 스타일 */
