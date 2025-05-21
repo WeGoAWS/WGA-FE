@@ -383,6 +383,9 @@
                             if (botResponse.elapsed_time) {
                                 botMessage.elapsed_time = botResponse.elapsed_time;
                             }
+                            if (botResponse.inference) {
+                                botMessage.inference = botResponse.inference;
+                            }
 
                             store.currentSession.messages.push(botMessage);
 
@@ -424,8 +427,11 @@
                                         ...(botResponse.query_result && {
                                             query_result: JSON.stringify(botResponse.query_result),
                                         }),
-                                        ...(botResponse.elapsed_time !== undefined && {
+                                        ...(botResponse.elapsed_time && {
                                             elapsed_time: botResponse.elapsed_time,
+                                        }),
+                                        ...(botResponse.inference && {
+                                            inference: JSON.stringify(botResponse.inference),
                                         }),
                                     },
                                     {
@@ -568,7 +574,16 @@
 
                     // API 응답 처리 로직
                     if (response.data) {
-                        if (
+                        // inference 필드가 있는 경우 처리 (추가)
+                        if (response.data.inference) {
+                            return {
+                                text: response.data.answer || '쿼리 결과 없음',
+                                query_string: response.data.query_string,
+                                query_result: response.data.query_result || [],
+                                elapsed_time: response.data.elapsed_time,
+                                inference: response.data.inference,
+                            };
+                        } else if (
                             response.data.query_string &&
                             response.data.elapsed_time !== undefined
                         ) {

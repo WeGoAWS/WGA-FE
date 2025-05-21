@@ -362,7 +362,21 @@ export const useChatHistoryStore = defineStore('chatHistory', {
 
                 // 새로운 형식 감지 및 처리
                 if (response.data) {
-                    if (response.data.query_string && response.data.elapsed_time !== undefined) {
+                    // inference 필드가 있는 경우 처리
+                    if (response.data.inference) {
+                        return {
+                            text: response.data.answer || '쿼리 결과 없음',
+                            query_string: response.data.query_string,
+                            query_result: response.data.query_result || [],
+                            elapsed_time: response.data.elapsed_time,
+                            inference: response.data.inference,
+                        };
+                    }
+                    // 기존 케이스 처리
+                    else if (
+                        response.data.query_string &&
+                        response.data.elapsed_time !== undefined
+                    ) {
                         // 케이스 1: 쿼리 정보가 포함된 응답
                         return {
                             text: response.data.answer || '쿼리 결과 없음',
