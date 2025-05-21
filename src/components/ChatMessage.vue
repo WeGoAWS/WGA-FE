@@ -38,7 +38,7 @@
                 </div>
 
                 <div v-if="showDetails" class="query-details">
-                    <div class="query-section">
+                    <div v-if="message.query_string" class="query-section">
                         <h4>SQL 쿼리</h4>
                         <pre
                             class="sql-query"

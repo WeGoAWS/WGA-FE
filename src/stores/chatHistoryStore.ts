@@ -285,8 +285,6 @@ export const useChatHistoryStore = defineStore('chatHistory', {
 
                 // 요청이 취소된 경우
                 if (axios.isCancel(err)) {
-                    console.log('사용자가 요청을 취소했습니다.');
-
                     // 로딩 메시지 제거
                     if (this.currentSession && Array.isArray(this.currentSession.messages)) {
                         this.currentSession.messages = this.currentSession.messages.filter(
@@ -334,7 +332,6 @@ export const useChatHistoryStore = defineStore('chatHistory', {
         // 요청 취소
         cancelRequest() {
             if (this.apiCancelToken) {
-                console.log('요청 취소 중...');
                 this.apiCancelToken.cancel('사용자가 요청을 취소했습니다.');
                 this.apiCancelToken = null;
             }
@@ -362,8 +359,6 @@ export const useChatHistoryStore = defineStore('chatHistory', {
                         cancelToken: this.apiCancelToken ? this.apiCancelToken.token : undefined,
                     },
                 );
-
-                console.log('API 응답 데이터:', response.data);
 
                 // 새로운 형식 감지 및 처리
                 if (response.data) {
