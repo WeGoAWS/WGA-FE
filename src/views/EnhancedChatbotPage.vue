@@ -767,10 +767,6 @@
     });
 </script>
 
-/* CSS Flexbox 레이아웃 최적화 */ .chatbot-container { transition: all 0.3s ease-in-out; }
-.chatbot-container:has(.chatbot-sidebar) { /* 사이드바가 있을 때 컨테이너 스타일 */ } @media
-(min-width: 768px) { /* 데스크톱에서 애니메이션이 자연스럽게 작동하도록 */ .sidebar-open {
-transition: all 0.3s ease-in-out; } }
 <style scoped>
     .chatbot-container {
         display: flex;
