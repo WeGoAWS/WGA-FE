@@ -424,7 +424,7 @@
                                         ...(botResponse.query_string && {
                                             query_string: botResponse.query_string,
                                         }),
-                                        ...(botResponse.query_result && {
+                                        ...(botResponse.query_result?.length && {
                                             query_result: JSON.stringify(botResponse.query_result),
                                         }),
                                         ...(botResponse.elapsed_time && {
