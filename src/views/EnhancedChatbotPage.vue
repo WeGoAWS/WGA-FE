@@ -345,8 +345,6 @@
                                 withCredentials: true,
                             },
                         );
-
-                        console.log('사용자 메시지 저장 완료:', userMessageResponse.data);
                     } catch (saveError) {
                         console.error('사용자 메시지 저장 오류:', saveError);
                         // 메시지 저장 실패해도 계속 진행
@@ -382,7 +380,7 @@
                                 botMessage.query_result = botResponse.query_result;
                             }
 
-                            if (botResponse.elapsed_time !== undefined) {
+                            if (botResponse.elapsed_time) {
                                 botMessage.elapsed_time = botResponse.elapsed_time;
                             }
 
@@ -437,8 +435,6 @@
                                         withCredentials: true,
                                     },
                                 );
-
-                                console.log('봇 메시지 저장 완료:', botMessageResponse.data);
                             } catch (saveError) {
                                 console.error('봇 메시지 저장 오류:', saveError);
                                 // 메시지 저장 실패해도 계속 진행
@@ -581,6 +577,11 @@
                                 text: response.data.answer || '쿼리 결과 없음',
                                 query_string: response.data.query_string,
                                 query_result: response.data.query_result || [],
+                                elapsed_time: response.data.elapsed_time,
+                            };
+                        } else if (response.data.elapsed_time) {
+                            return {
+                                text: response.data.answer || '쿼리 결과 없음',
                                 elapsed_time: response.data.elapsed_time,
                             };
                         } else if (Array.isArray(response.data.answer)) {
