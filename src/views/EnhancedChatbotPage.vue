@@ -8,22 +8,13 @@
                     class="chatbot-sidebar"
                     :class="{ 'disabled-sidebar': store.waitingForResponse }"
                 >
-                    <div class="sidebar-header">
-                        <h2>대화 목록</h2>
-                        <button @click="toggleSidebar" class="close-sidebar-button">
-                            <span>&times;</span>
-                        </button>
-                    </div>
                     <ChatHistory
                         :disabled="store.waitingForResponse"
                         @session-click="handleSessionClick"
                     />
                 </div>
             </transition>
-
-            <!-- 배경 오버레이 (모바일에서 사이드바 열릴 때) -->
-            <div v-if="isSidebarOpen" class="sidebar-overlay" @click="toggleSidebar"></div>
-
+            
             <!-- 메인 채팅 영역 -->
             <div class="chatbot-main" :class="{ 'sidebar-open': isSidebarOpen }">
                 <div class="chat-header">
