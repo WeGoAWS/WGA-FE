@@ -374,20 +374,7 @@
                                 const sessionId = store.currentSession.sessionId;
 
                                 // elapsed_time이 있으면 텍스트 메시지에 추가
-                                let messageText = botResponse.text || '';
-                                if (botResponse.elapsed_time) {
-                                    // 이미 마지막 줄에 실행시간이 포함되어 있는지 확인
-                                    if (
-                                        !messageText.includes(
-                                            `실행시간: ${botResponse.elapsed_time}`,
-                                        )
-                                    ) {
-                                        // 개행 후 실행시간 추가
-                                        messageText =
-                                            messageText.trim() +
-                                            `\n\n실행시간: ${botResponse.elapsed_time}`;
-                                    }
-                                }
+                                const messageText = botResponse.text || '';
 
                                 // 봇 메시지를 서버에 저장
                                 await axios.post(
