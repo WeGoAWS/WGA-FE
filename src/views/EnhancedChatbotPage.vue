@@ -157,8 +157,7 @@
                             v-model="messageText"
                             class="chat-input"
                             placeholder="질문을 입력하세요..."
-                            @keydown.enter.prevent="handleEnterKey"
-                            @keydown.esc="handleEscKey"
+                            @keydown="handleKeydown"
                             :disabled="store.waitingForResponse"
                             ref="inputRef"
                             rows="1"
@@ -305,6 +304,30 @@
                 } else {
                     // 아니면 메시지 전송
                     sendMessage();
+                }
+            };
+
+            const handleKeydown = (e: KeyboardEvent) => {
+                if (e.key === 'Enter') {
+                    if (e.shiftKey) {
+                        // Shift+Enter는 줄바꿈 허용 (기본 동작 유지)
+                        return;
+                    } else {
+                        // Enter만 누른 경우
+                        e.preventDefault();
+                        if (store.waitingForResponse) {
+                            // 요청 중이면 취소
+                            cancelRequest();
+                        } else {
+                            // 아니면 메시지 전송
+                            sendMessage();
+                        }
+                    }
+                } else if (e.key === 'Escape') {
+                    // ESC 키 처리 (요청 취소)
+                    if (store.waitingForResponse) {
+                        cancelRequest();
+                    }
                 }
             };
 
@@ -732,6 +755,7 @@
                 toggleSidebar, // 사이드바 토글 함수 노출
                 handleEnterKey,
                 handleEscKey,
+                handleKeydown,
                 autoResize,
                 cancelRequest,
             };

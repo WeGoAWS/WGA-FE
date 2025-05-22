@@ -84,8 +84,11 @@
                 <textarea
                     v-model="messageText"
                     class="start-chat-input"
-                    placeholder="AWS 클라우드 운영에 관한 질문을 입력하세요..."
-                    @keydown.enter.prevent="startNewChat"
+                    placeholder="AWS 클라우드 운영에 관한 질문을 입력하세요... (Shift+Enter로 줄바꿈)"
+                    @keydown="handleKeydown"
+                    ref="inputRef"
+                    rows="1"
+                    @input="autoResize"
                 ></textarea>
                 <button @click="startNewChat" class="send-button" :disabled="!messageText.trim()">
                     <span>질문하기</span>
@@ -216,7 +219,7 @@
 </template>
 
 <script lang="ts">
-    import { defineComponent, onMounted, ref } from 'vue';
+    import { defineComponent, nextTick, onMounted, ref } from 'vue';
     import { useRouter } from 'vue-router';
     import AppLayout from '@/layouts/AppLayout.vue';
     import { useChatHistoryStore } from '@/stores/chatHistoryStore';
@@ -233,6 +236,7 @@
             const chatHistoryStore = useChatHistoryStore();
             const messageText = ref('');
             const isNavOpen = ref(false);
+            const inputRef = ref<HTMLTextAreaElement | null>(null);
 
             onMounted(async () => {
                 if (chatHistoryStore.sessions.length === 0) {
@@ -265,6 +269,32 @@
                 }
             };
 
+            // 키보드 이벤트 처리 함수 (Shift+Enter는 줄바꿈, Enter는 전송)
+            const handleKeydown = (e: KeyboardEvent) => {
+                if (e.key === 'Enter') {
+                    if (e.shiftKey) {
+                        // Shift+Enter는 줄바꿈 허용 (기본 동작 유지)
+                        return;
+                    } else {
+                        // Enter만 누른 경우 전송
+                        e.preventDefault();
+                        startNewChat();
+                    }
+                }
+            };
+
+            // 텍스트 에어리어 자동 크기 조절 함수 추가
+            const autoResize = () => {
+                if (!inputRef.value) return;
+
+                // 높이 초기화
+                inputRef.value.style.height = 'auto';
+
+                // 새 높이 설정 (스크롤 높이 기준, 최대 5줄 정도로 제한)
+                const newHeight = Math.min(inputRef.value.scrollHeight, 150);
+                inputRef.value.style.height = `${newHeight}px`;
+            };
+
             const startNewChat = async () => {
                 if (!messageText.value.trim()) return;
 
@@ -281,6 +311,12 @@
 
             const askExampleQuestion = (question: string) => {
                 messageText.value = question;
+
+                // 질문을 설정한 후 자동 크기 조절
+                nextTick(() => {
+                    autoResize();
+                });
+
                 startNewChat();
             };
 
@@ -323,6 +359,7 @@
                 messageText,
                 chatHistoryStore,
                 isNavOpen,
+                inputRef,
                 toggleNav,
                 loadSessions,
                 selectAndGoToChat,
@@ -331,6 +368,8 @@
                 goToEnhancedChat,
                 formatDate,
                 getHealth,
+                handleKeydown,
+                autoResize,
             };
         },
     });
@@ -720,6 +759,36 @@
 
         .start-chat-header h1 {
             font-size: 2rem;
+        }
+    }
+
+    .start-chat-input {
+        flex: 1;
+        padding: 1.25rem 1.5rem;
+        font-size: 1rem;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px 0 0 12px;
+        resize: none;
+        height: auto;
+        min-height: 60px;
+        max-height: 150px;
+        font-family: inherit;
+        transition: border-color 0.3s;
+        background-color: #fff;
+        line-height: 1.5;
+    }
+
+    .start-chat-input:focus {
+        outline: none;
+        border-color: #007bff;
+    }
+
+    /* 반응형 스타일에서 모바일 텍스트 에어리어 높이 조정 */
+    @media (max-width: 768px) {
+        .start-chat-input {
+            min-height: 50px;
+            max-height: 120px;
+            padding: 1rem 1.2rem;
         }
     }
 </style>
