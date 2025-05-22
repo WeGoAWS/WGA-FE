@@ -1367,4 +1367,57 @@
     .warning-confirm-button:hover {
         background-color: #ef6c00;
     }
+
+    .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px;
+        border-bottom: 1px solid #e5e5e5;
+        background-color: #f8f9fa;
+    }
+
+    .close-sidebar-button {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #666;
+        padding: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        transition: background-color 0.2s;
+    }
+
+    .close-sidebar-button:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 90;
+    }
+
+    .slide-enter-active,
+    .slide-leave-active {
+        transition: transform 0.3s ease-in-out;
+    }
+
+    .slide-enter-from,
+    .slide-leave-to {
+        transform: translateX(-300px);
+    }
+
+    .slide-enter-to,
+    .slide-leave-from {
+        transform: translateX(0);
+    }
 </style>
