@@ -3,10 +3,10 @@ export interface ChatMessageType {
     id: string;
     sender: 'user' | 'bot';
     text: string;
-    displayText?: string;
+    displayText?: string; // 타이핑 애니메이션을 위한 표시 텍스트
     timestamp: string;
-    isTyping?: boolean;
-    animationState?: 'appear' | 'typing' | 'complete';
+    isTyping?: boolean; // 타이핑 중인지 여부
+    animationState?: 'appear' | 'typing' | 'complete'; // 애니메이션 상태
     query_string?: string;
     query_result?: any[];
     elapsed_time?: string | number;
@@ -15,10 +15,11 @@ export interface ChatMessageType {
 
 export interface ChatSession {
     sessionId: string;
+    userId: string;
     title: string;
-    messages: ChatMessageType[];
     createdAt: string;
     updatedAt: string;
+    messages: ChatMessageType[];
 }
 
 export interface ChatHistoryState {

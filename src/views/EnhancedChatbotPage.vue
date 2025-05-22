@@ -310,8 +310,12 @@
 
             // ESC 키 처리 (요청 취소)
             const handleEscKey = () => {
+                console.log('handleEscKey 호출됨, waitingForResponse:', store.waitingForResponse);
                 if (store.waitingForResponse) {
+                    console.log('ESC로 요청 취소 시도');
                     cancelRequest();
+                } else {
+                    console.log('취소할 요청이 없음');
                 }
             };
 
@@ -329,8 +333,14 @@
 
             // 요청 취소
             const cancelRequest = () => {
-                store.cancelRequest();
-                showCancelIcon.value = false;
+                console.log('취소 요청 중...');
+                if (store.waitingForResponse) {
+                    store.cancelRequest();
+                    showCancelIcon.value = false;
+                    console.log('취소 요청 완료');
+                } else {
+                    console.log('취소할 요청이 없습니다');
+                }
             };
 
             onMounted(async () => {
@@ -397,8 +407,19 @@
                     // 윈도우 리사이즈 이벤트 리스너 등록
                     window.addEventListener('resize', handleResize);
 
+                    // ESC 키 이벤트 리스너 등록 (전역으로)
+                    const handleGlobalKeydown = (e: KeyboardEvent) => {
+                        if (e.key === 'Escape') {
+                            console.log('ESC 키가 눌렸습니다');
+                            handleEscKey();
+                        }
+                    };
+
+                    document.addEventListener('keydown', handleGlobalKeydown);
+
                     return () => {
                         window.removeEventListener('resize', handleResize);
+                        document.removeEventListener('keydown', handleGlobalKeydown);
                     };
                 } catch (error) {
                     console.error('채팅 페이지 초기화 오류:', error);
@@ -517,88 +538,8 @@
                     }
 
                     try {
-                        // 직접 API 호출하여 봇 응답 생성
-                        const botResponse = await generateBotResponse(messageToSend);
-
-                        // 현재 세션과 메시지 배열이 존재하는지 확인
-                        if (store.currentSession && Array.isArray(store.currentSession.messages)) {
-                            // 로딩 메시지 제거
-                            store.currentSession.messages = store.currentSession.messages.filter(
-                                (msg) => msg.id !== loadingId,
-                            );
-
-                            // 실제 봇 메시지 추가 - 응답 형식에 따라 필드 추가
-                            const botMessage: ChatMessageType = {
-                                id: 'bot-' + Date.now().toString(36),
-                                sender: 'bot',
-                                text: botResponse.text || '',
-                                displayText: '', // 초기에는 빈 문자열로 시작
-                                timestamp: new Date().toISOString(),
-                                animationState: 'typing',
-                            };
-
-                            // 쿼리 정보가 있으면 추가
-                            if (botResponse.query_string) {
-                                botMessage.query_string = botResponse.query_string;
-                            }
-
-                            if (botResponse.query_result) {
-                                botMessage.query_result = botResponse.query_result;
-                            }
-
-                            if (botResponse.elapsed_time) {
-                                botMessage.elapsed_time = botResponse.elapsed_time;
-                            }
-                            if (botResponse.inference) {
-                                botMessage.inference = botResponse.inference;
-                            }
-
-                            store.currentSession.messages.push(botMessage);
-
-                            // 타이핑 애니메이션
-                            await simulateTyping(botMessage.id, botResponse.text || '');
-
-                            // 봇 메시지를 서버에 저장 (API 호출)
-                            try {
-                                const apiUrl =
-                                    import.meta.env.VITE_API_DEST || 'http://localhost:8000';
-                                const sessionId = store.currentSession.sessionId;
-
-                                // elapsed_time이 있으면 텍스트 메시지에 추가
-                                const messageText = botResponse.text || '';
-
-                                // 봇 메시지를 서버에 저장
-                                await axios.post(
-                                    `${apiUrl}/sessions/${sessionId}/messages`,
-                                    {
-                                        sender: 'bot',
-                                        text: messageText,
-                                        // 추가 정보가 있으면 함께 전송
-                                        ...(botResponse.query_string && {
-                                            query_string: botResponse.query_string,
-                                        }),
-                                        ...(botResponse.query_result?.length && {
-                                            query_result: JSON.stringify(botResponse.query_result),
-                                        }),
-                                        ...(botResponse.elapsed_time && {
-                                            elapsed_time: botResponse.elapsed_time,
-                                        }),
-                                        ...(botResponse.inference && {
-                                            inference: JSON.stringify(botResponse.inference),
-                                        }),
-                                    },
-                                    {
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        withCredentials: true,
-                                    },
-                                );
-                            } catch (saveError) {
-                                console.error('봇 메시지 저장 오류:', saveError);
-                                // 메시지 저장 실패해도 계속 진행
-                            }
-                        }
+                        // store.sendMessage 사용하여 취소 토큰 관리 일원화
+                        await store.sendMessage(messageToSend);
                     } catch (responseError) {
                         console.error('봇 응답 가져오기 오류:', responseError);
 
@@ -609,38 +550,13 @@
                                 (msg) => msg.id !== loadingId,
                             );
 
-                            // 오류 메시지 추가
-                            const errorMessage: ChatMessageType = {
-                                id: 'error-' + Date.now().toString(36),
-                                sender: 'bot',
-                                text: '죄송합니다. 응답을 처리하는 중에 오류가 발생했습니다. 다시 시도해 주세요.',
-                                timestamp: new Date().toISOString(),
-                                animationState: 'appear',
-                            };
-
-                            store.currentSession.messages.push(errorMessage);
-
-                            // 오류 메시지도 서버에 저장
-                            try {
-                                const apiUrl =
-                                    import.meta.env.VITE_API_DEST || 'http://localhost:8000';
-                                const sessionId = store.currentSession.sessionId;
-
-                                await axios.post(
-                                    `${apiUrl}/sessions/${sessionId}/messages`,
-                                    {
-                                        sender: 'bot',
-                                        text: errorMessage.text,
-                                    },
-                                    {
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        withCredentials: true,
-                                    },
-                                );
-                            } catch (saveError) {
-                                console.error('오류 메시지 저장 실패:', saveError);
+                            // 취소된 요청인지 확인
+                            if (axios.isCancel(responseError)) {
+                                console.log('요청이 취소되었습니다');
+                                // store에서 이미 취소 메시지를 처리하므로 여기서는 별도 처리 불필요
+                            } else {
+                                // 오류 메시지는 store에서 처리되므로 여기서는 로깅만
+                                console.error('API 오류:', responseError);
                             }
                         }
                     }
@@ -698,6 +614,7 @@
             const confirmSessionChange = async () => {
                 if (targetSessionId.value) {
                     // 현재 응답 대기 상태 해제
+                    store.cancelRequest();
                     store.waitingForResponse = false;
 
                     // 세션 전환
@@ -714,13 +631,13 @@
                 }
             };
 
-            // 봇 응답 생성 함수
+            // 봇 응답 생성 함수 (store의 취소 토큰 사용)
             const generateBotResponse = async (userMessage: string): Promise<BotResponse> => {
                 try {
                     // API URL 설정
                     const apiUrl = import.meta.env.VITE_API_DEST || 'http://localhost:8000';
 
-                    // API 호출 시 isCached 값을 포함
+                    // API 호출 시 isCached 값을 포함하고 store의 취소 토큰 사용
                     const response = await axios.post(
                         `${apiUrl}/llm1`,
                         {
@@ -1545,5 +1462,105 @@
             gap: 8px;
             padding: 8px;
         }
+    }
+
+    /* 처리 중 인디케이터 스타일 */
+    .processing-indicator {
+        position: absolute;
+        top: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        background-color: #fff8e1;
+        border: 1px solid #ffd54f;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        color: #f57c00;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+        }
+        70% {
+            box-shadow: 0 0 0 6px rgba(255, 193, 7, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+        }
+    }
+
+    .processing-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(245, 124, 0, 0.2);
+        border-top: 2px solid #f57c00;
+        border-radius: 50%;
+        margin-right: 8px;
+        animation: spin 1s linear infinite;
+    }
+
+    /* 세션 전환 경고 모달 스타일 */
+    .session-warning-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .session-warning-content {
+        background-color: white;
+        padding: 24px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .session-warning-content h3 {
+        margin-top: 0;
+        margin-bottom: 16px;
+        color: #f57c00;
+    }
+
+    .warning-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    .cancel-button {
+        padding: 8px 16px;
+        background-color: #f0f0f0;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    .warning-confirm-button {
+        padding: 8px 16px;
+        background-color: #f57c00;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    .cancel-button:hover {
+        background-color: #e0e0e0;
+    }
+
+    .warning-confirm-button:hover {
+        background-color: #ef6c00;
     }
 </style>

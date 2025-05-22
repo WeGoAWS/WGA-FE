@@ -229,10 +229,12 @@ export const useChatHistoryStore = defineStore('chatHistory', {
                 this.currentSession!.messages.push(loadingMessage);
 
                 // API 호출 취소 토큰 생성
+                console.log('API 취소 토큰 생성 중...');
                 this.apiCancelToken = axios.CancelToken.source();
+                console.log('API 취소 토큰 생성 완료:', !!this.apiCancelToken);
 
                 // API 호출하여 봇 응답 가져오기
-                const botResponseText = await this.generateBotResponse(text);
+                const botResponseData = await this.generateBotResponse(text);
 
                 // 로딩 메시지 제거
                 if (this.currentSession && Array.isArray(this.currentSession.messages)) {
@@ -246,7 +248,20 @@ export const useChatHistoryStore = defineStore('chatHistory', {
                     `${apiUrl}/sessions/${sessionId}/messages`,
                     {
                         sender: 'bot',
-                        text: botResponseText,
+                        text: botResponseData.text,
+                        // 추가 정보가 있으면 함께 전송
+                        ...(botResponseData.query_string && {
+                            query_string: botResponseData.query_string,
+                        }),
+                        ...(botResponseData.query_result?.length && {
+                            query_result: JSON.stringify(botResponseData.query_result),
+                        }),
+                        ...(botResponseData.elapsed_time && {
+                            elapsed_time: botResponseData.elapsed_time,
+                        }),
+                        ...(botResponseData.inference && {
+                            inference: JSON.stringify(botResponseData.inference),
+                        }),
                     },
                     {
                         headers: {
@@ -257,6 +272,21 @@ export const useChatHistoryStore = defineStore('chatHistory', {
                 );
 
                 const botMessage = botMessageResponse.data;
+
+                // 추가 데이터가 있으면 메시지에 포함
+                if (botResponseData.query_string) {
+                    botMessage.query_string = botResponseData.query_string;
+                }
+                if (botResponseData.query_result) {
+                    botMessage.query_result = botResponseData.query_result;
+                }
+                if (botResponseData.elapsed_time) {
+                    botMessage.elapsed_time = botResponseData.elapsed_time;
+                }
+                if (botResponseData.inference) {
+                    botMessage.inference = botResponseData.inference;
+                }
+
                 botMessage.displayText = ''; // 초기에는 빈 문자열로 시작
                 botMessage.animationState = 'typing';
 
@@ -285,6 +315,8 @@ export const useChatHistoryStore = defineStore('chatHistory', {
 
                 // 요청이 취소된 경우
                 if (axios.isCancel(err)) {
+                    console.log('사용자가 요청을 취소했습니다.');
+
                     // 로딩 메시지 제거
                     if (this.currentSession && Array.isArray(this.currentSession.messages)) {
                         this.currentSession.messages = this.currentSession.messages.filter(
@@ -331,16 +363,23 @@ export const useChatHistoryStore = defineStore('chatHistory', {
 
         // 요청 취소
         cancelRequest() {
+            console.log('store.cancelRequest 호출됨, apiCancelToken 존재:', !!this.apiCancelToken);
             if (this.apiCancelToken) {
+                console.log('API 요청 취소 중...');
                 this.apiCancelToken.cancel('사용자가 요청을 취소했습니다.');
                 this.apiCancelToken = null;
+                this.waitingForResponse = false;
+                console.log('API 요청 취소 완료');
+            } else {
+                console.log('취소할 API 토큰이 없습니다');
             }
         },
 
         // 봇 응답 생성 함수
-        // src/stores/chatHistoryStore.ts 파일의 generateBotResponse 함수 수정
         async generateBotResponse(userMessage: string): Promise<BotResponse> {
             try {
+                console.log('generateBotResponse 호출, 취소 토큰 존재:', !!this.apiCancelToken);
+
                 // API URL 설정
                 const apiUrl = import.meta.env.VITE_API_DEST || 'http://localhost:8000';
 
@@ -359,6 +398,8 @@ export const useChatHistoryStore = defineStore('chatHistory', {
                         cancelToken: this.apiCancelToken ? this.apiCancelToken.token : undefined,
                     },
                 );
+
+                console.log('API 응답 받음:', !!response.data);
 
                 // 새로운 형식 감지 및 처리
                 if (response.data) {
@@ -420,8 +461,11 @@ export const useChatHistoryStore = defineStore('chatHistory', {
                     text: '죄송합니다. 유효한 응답 데이터를 받지 못했습니다.',
                 };
             } catch (error) {
+                console.log('generateBotResponse 오류:', error);
+
                 // 오류 처리는 그대로 유지
                 if (axios.isCancel(error)) {
+                    console.log('API 요청이 취소되었습니다');
                     throw error;
                 }
                 console.error('봇 응답 API 호출 오류:', error);
