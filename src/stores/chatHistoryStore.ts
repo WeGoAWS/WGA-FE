@@ -293,6 +293,15 @@ export const useChatHistoryStore = defineStore('chatHistory', {
                 // 메시지 목록에 봇 메시지 추가
                 if (this.currentSession && Array.isArray(this.currentSession.messages)) {
                     this.currentSession.messages.push(botMessage);
+
+                    // 타이핑 애니메이션을 위해 displayText와 animationState 설정
+                    const addedMessage =
+                        this.currentSession.messages[this.currentSession.messages.length - 1];
+                    addedMessage.displayText = '';
+                    addedMessage.animationState = 'typing';
+
+                    // 타이핑 애니메이션 시뮬레이션 (간단한 버전)
+                    this.simulateTypingAnimation(addedMessage.id, botResponseData.text || '');
                 }
 
                 // 세션 목록 업데이트 (최신 내용 반영)
@@ -309,6 +318,7 @@ export const useChatHistoryStore = defineStore('chatHistory', {
                 // 취소 토큰 초기화
                 this.apiCancelToken = null;
 
+                console.log('메시지 전송 완료');
                 return botMessage;
             } catch (err: any) {
                 console.error('메시지 전송 오류:', err);
@@ -336,6 +346,30 @@ export const useChatHistoryStore = defineStore('chatHistory', {
                     if (this.currentSession && Array.isArray(this.currentSession.messages)) {
                         this.currentSession.messages.push(cancelMessage);
                     }
+
+                    // 취소 메시지도 서버에 저장
+                    try {
+                        const apiUrl = import.meta.env.VITE_API_DEST || 'http://localhost:8000';
+                        const sessionId = this.currentSession!.sessionId;
+
+                        await axios.post(
+                            `${apiUrl}/sessions/${sessionId}/messages`,
+                            {
+                                sender: 'bot',
+                                text: cancelMessage.text,
+                            },
+                            {
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                withCredentials: true,
+                            },
+                        );
+                        console.log('취소 메시지가 서버에 저장되었습니다.');
+                    } catch (saveError) {
+                        console.error('취소 메시지 저장 오류:', saveError);
+                        // 저장 실패해도 UI에는 표시됨
+                    }
                 } else {
                     // 다른 오류인 경우
                     // 오류 메시지 추가
@@ -349,6 +383,30 @@ export const useChatHistoryStore = defineStore('chatHistory', {
 
                     if (this.currentSession && Array.isArray(this.currentSession.messages)) {
                         this.currentSession.messages.push(errorMessage);
+                    }
+
+                    // 오류 메시지도 서버에 저장
+                    try {
+                        const apiUrl = import.meta.env.VITE_API_DEST || 'http://localhost:8000';
+                        const sessionId = this.currentSession!.sessionId;
+
+                        await axios.post(
+                            `${apiUrl}/sessions/${sessionId}/messages`,
+                            {
+                                sender: 'bot',
+                                text: errorMessage.text,
+                            },
+                            {
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                withCredentials: true,
+                            },
+                        );
+                        console.log('오류 메시지가 서버에 저장되었습니다.');
+                    } catch (saveError) {
+                        console.error('오류 메시지 저장 실패:', saveError);
+                        // 저장 실패해도 UI에는 표시됨
                     }
 
                     this.error = err.message || '메시지를 전송하는 중 오류가 발생했습니다.';
@@ -472,6 +530,46 @@ export const useChatHistoryStore = defineStore('chatHistory', {
                 return {
                     text: '죄송합니다. 응답을 처리하는 중에 오류가 발생했습니다. 다시 시도해 주세요.',
                 };
+            }
+        },
+
+        // 타이핑 애니메이션 시뮬레이션 (store 내부용)
+        async simulateTypingAnimation(messageId: string, fullText: string) {
+            if (!this.currentSession || !Array.isArray(this.currentSession.messages)) return;
+
+            const message = this.currentSession.messages.find((m) => m.id === messageId);
+            if (!message) return;
+
+            const typingSpeed = 10; // 문자당 타이핑 시간 (밀리초)
+            const maxTypingTime = 2000; // 최대 타이핑 시간 (밀리초)
+
+            // 최대 타이핑 시간에 맞춰 속도 조절
+            const totalTypingTime = Math.min(fullText.length * typingSpeed, maxTypingTime);
+            const charInterval = totalTypingTime / fullText.length;
+
+            message.displayText = '';
+
+            for (let i = 0; i < fullText.length; i++) {
+                await new Promise((resolve) => setTimeout(resolve, charInterval));
+
+                // 메시지가 여전히 존재하는지 확인
+                if (!this.currentSession || !Array.isArray(this.currentSession.messages)) {
+                    return;
+                }
+
+                const updatedMessage = this.currentSession.messages.find((m) => m.id === messageId);
+                if (!updatedMessage) return;
+
+                // 다음 글자 추가
+                updatedMessage.displayText = fullText.substring(0, i + 1);
+            }
+
+            // 애니메이션 완료 상태로 변경
+            if (!this.currentSession || !Array.isArray(this.currentSession.messages)) return;
+
+            const completedMessage = this.currentSession.messages.find((m) => m.id === messageId);
+            if (completedMessage) {
+                completedMessage.animationState = 'complete';
             }
         },
 

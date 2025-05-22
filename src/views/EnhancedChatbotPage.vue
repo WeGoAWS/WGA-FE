@@ -255,7 +255,7 @@
     import ChatHistory from '@/components/ChatHistory.vue';
     import ChatMessage from '@/components/ChatMessage.vue';
     import { useChatHistoryStore } from '@/stores/chatHistoryStore';
-    import type { BotResponse, ChatMessageType } from '@/types/chat';
+    import type { BotResponse } from '@/types/chat';
 
     export default defineComponent({
         name: 'EnhancedChatbotPage',
@@ -457,50 +457,7 @@
                         store.currentSession.messages = [];
                     }
 
-                    const messageId = 'msg-' + Date.now().toString(36);
-
-                    const userMessage: ChatMessageType = {
-                        id: messageId,
-                        sender: 'user',
-                        text: messageToSend,
-                        timestamp: new Date().toISOString(),
-                        animationState: 'appear',
-                    };
-
-                    // 안전하게 메시지를 UI에 추가 (null 체크)
-                    if (store.currentSession && Array.isArray(store.currentSession.messages)) {
-                        store.currentSession.messages.push(userMessage);
-                    } else {
-                        console.error('세션 또는 메시지 배열이 없습니다');
-                        return;
-                    }
-
-                    // 로딩 메시지 즉시 추가
-                    const loadingId = 'loading-' + Date.now().toString(36);
-                    const loadingMessage: ChatMessageType = {
-                        id: loadingId,
-                        sender: 'bot',
-                        text: '...',
-                        timestamp: new Date().toISOString(),
-                        isTyping: true,
-                    };
-
-                    // 안전하게 로딩 메시지를 UI에 추가 (null 체크)
-                    if (store.currentSession && Array.isArray(store.currentSession.messages)) {
-                        store.currentSession.messages.push(loadingMessage);
-                    } else {
-                        console.error('세션 또는 메시지 배열이 없습니다');
-                        return;
-                    }
-
-                    store.waitingForResponse = true;
-
-                    // 모바일에서 메시지 전송 시 사이드바 닫기
-                    if (window.innerWidth < 768) {
-                        isSidebarOpen.value = false;
-                    }
-
-                    // UI 텍스트 입력창 초기화
+                    // UI 텍스트 입력창 초기화 (메시지 전송 전에)
                     if (!text) {
                         messageText.value = '';
                         // 텍스트 에어리어 높이 초기화
@@ -509,68 +466,23 @@
                         }
                     }
 
-                    // UI 업데이트 및 스크롤 조정
-                    await nextTick();
-                    scrollToBottom();
-
-                    // 서버에 사용자 메시지 저장 (API 호출)
-                    try {
-                        const apiUrl = import.meta.env.VITE_API_DEST || 'http://localhost:8000';
-                        const sessionId = store.currentSession.sessionId;
-
-                        // 사용자 메시지를 서버에 저장
-                        const userMessageResponse = await axios.post(
-                            `${apiUrl}/sessions/${sessionId}/messages`,
-                            {
-                                sender: 'user',
-                                text: messageToSend,
-                            },
-                            {
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                withCredentials: true,
-                            },
-                        );
-                    } catch (saveError) {
-                        console.error('사용자 메시지 저장 오류:', saveError);
-                        // 메시지 저장 실패해도 계속 진행
+                    // 모바일에서 메시지 전송 시 사이드바 닫기
+                    if (window.innerWidth < 768) {
+                        isSidebarOpen.value = false;
                     }
 
-                    try {
-                        // store.sendMessage 사용하여 취소 토큰 관리 일원화
-                        await store.sendMessage(messageToSend);
-                    } catch (responseError) {
-                        console.error('봇 응답 가져오기 오류:', responseError);
-
-                        // 현재 세션과 메시지 배열이 존재하는지 확인
-                        if (store.currentSession && Array.isArray(store.currentSession.messages)) {
-                            // 로딩 메시지 제거
-                            store.currentSession.messages = store.currentSession.messages.filter(
-                                (msg) => msg.id !== loadingId,
-                            );
-
-                            // 취소된 요청인지 확인
-                            if (axios.isCancel(responseError)) {
-                                console.log('요청이 취소되었습니다');
-                                // store에서 이미 취소 메시지를 처리하므로 여기서는 별도 처리 불필요
-                            } else {
-                                // 오류 메시지는 store에서 처리되므로 여기서는 로깅만
-                                console.error('API 오류:', responseError);
-                            }
-                        }
-                    }
-
-                    // 대화 상태 업데이트
-                    store.waitingForResponse = false;
+                    // store.sendMessage를 사용하여 메시지 전송 (중복 제거)
+                    // store에서 모든 UI 업데이트와 API 호출을 처리
+                    await store.sendMessage(messageToSend);
 
                     // 스크롤 조정
                     await nextTick();
                     scrollToBottom();
                 } catch (error) {
                     console.error('메시지 전송 중 오류 발생:', error);
-                    store.error = '메시지를 전송하는 중 오류가 발생했습니다.';
-                    store.waitingForResponse = false;
+                    if (!axios.isCancel(error)) {
+                        store.error = '메시지를 전송하는 중 오류가 발생했습니다.';
+                    }
                 }
             };
 
