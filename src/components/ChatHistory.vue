@@ -298,6 +298,7 @@
         position: relative;
     }
 
+    /* 비활성화 상태 스타일 */
     .disabled-chat-history {
         opacity: 0.7;
         position: relative;
@@ -375,9 +376,9 @@
 
     .chat-sessions {
         flex: 1;
-        justify-content: space-between;
         overflow-y: auto;
         padding: 12px;
+        padding-bottom: 72px;
         display: flex;
         flex-direction: column;
     }
@@ -410,7 +411,7 @@
         font-weight: 500;
         margin-bottom: 6px;
         word-break: break-word;
-        padding-right: 60px;
+        padding-right: 60px; /* 액션 버튼 공간 확보 */
     }
 
     .session-date {
@@ -458,14 +459,18 @@
         opacity: 1;
     }
 
+    /* 대화 전체 삭제 버튼 스타일 - 사이드바 내부에 fixed 위치 */
     .delete-all-button {
+        position: absolute;
+        bottom: 0;
+        left: 10px;
+        width: 260px;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
-        width: 100%;
-        height: 50px;
-        margin-top: 12px;
+        height: 60px;
+        margin: 0;
         background-color: #f8f9fa;
         border: 1px solid #dc3545;
         border-radius: 8px;
@@ -474,20 +479,20 @@
         font-weight: 500;
         font-size: 0.95rem;
         transition: all 0.2s ease;
+        z-index: 10;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
     }
 
     .delete-all-button:hover:not(:disabled) {
         background-color: #dc3545;
         color: white;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+        box-shadow: 0 -4px 15px rgba(220, 53, 69, 0.3);
     }
 
     .delete-all-button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
     }
 
     .delete-all-button svg {
@@ -501,6 +506,7 @@
         justify-content: center;
         height: 100%;
         padding: 20px;
+        padding-bottom: 80px; /* delete-all-button 공간 확보 */
         color: #666;
         text-align: center;
     }
@@ -524,6 +530,7 @@
         cursor: not-allowed;
     }
 
+    /* 모달 스타일 */
     .rename-modal,
     .delete-modal {
         position: fixed;
@@ -610,6 +617,7 @@
         margin-bottom: 20px;
     }
 
+    /* 반응형 스타일 */
     @media (max-width: 768px) {
         .sidebar-header {
             padding: 10px;
@@ -631,8 +639,16 @@
         }
 
         .delete-all-button {
-            height: 45px;
+            height: 55px;
             font-size: 0.9rem;
+        }
+
+        .chat-sessions {
+            padding-bottom: 68px; /* 모바일에서 버튼 높이에 맞춰 조정 */
+        }
+
+        .empty-sessions {
+            padding-bottom: 75px;
         }
     }
 </style>
