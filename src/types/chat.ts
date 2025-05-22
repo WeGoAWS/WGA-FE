@@ -3,10 +3,10 @@ export interface ChatMessageType {
     id: string;
     sender: 'user' | 'bot';
     text: string;
-    displayText?: string; // 타이핑 애니메이션을 위한 표시 텍스트
+    displayText?: string;
     timestamp: string;
-    isTyping?: boolean; // 타이핑 중인지 여부
-    animationState?: 'appear' | 'typing' | 'complete'; // 애니메이션 상태
+    isTyping?: boolean;
+    animationState?: 'appear' | 'typing' | 'complete';
     query_string?: string;
     query_result?: any[];
     elapsed_time?: string | number;

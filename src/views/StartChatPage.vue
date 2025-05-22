@@ -1,7 +1,6 @@
 <!-- src/views/StartChatPage.vue -->
 <template>
     <AppLayout>
-        <!-- 새로 추가된 네비게이션 사이드바 -->
         <transition name="slide">
             <div v-if="isNavOpen" class="nav-sidebar">
                 <div class="nav-header">
@@ -11,7 +10,6 @@
                     </button>
                 </div>
 
-                <!-- 대화 내역 목록 -->
                 <div v-if="chatHistoryStore.loading" class="nav-loading">
                     <div class="nav-spinner"></div>
                     <span>로딩 중...</span>
@@ -36,13 +34,11 @@
             </div>
         </transition>
 
-        <!-- 배경 오버레이 (모바일에서 네비게이션 열릴 때) -->
         <div v-if="isNavOpen" class="nav-overlay" @click="toggleNav"></div>
 
         <div class="start-chat-container">
             <div class="start-chat-header">
                 <div class="header-content">
-                    <!-- 새로 추가된 메뉴 버튼 -->
                     <button @click="toggleNav" class="nav-toggle-button">
                         <svg
                             width="24"
@@ -269,28 +265,22 @@
                 }
             };
 
-            // 키보드 이벤트 처리 함수 (Shift+Enter는 줄바꿈, Enter는 전송)
             const handleKeydown = (e: KeyboardEvent) => {
                 if (e.key === 'Enter') {
                     if (e.shiftKey) {
-                        // Shift+Enter는 줄바꿈 허용 (기본 동작 유지)
                         return;
                     } else {
-                        // Enter만 누른 경우 전송
                         e.preventDefault();
                         startNewChat();
                     }
                 }
             };
 
-            // 텍스트 에어리어 자동 크기 조절 함수 추가
             const autoResize = () => {
                 if (!inputRef.value) return;
 
-                // 높이 초기화
                 inputRef.value.style.height = 'auto';
 
-                // 새 높이 설정 (스크롤 높이 기준, 최대 5줄 정도로 제한)
                 const newHeight = Math.min(inputRef.value.scrollHeight, 150);
                 inputRef.value.style.height = `${newHeight}px`;
             };
@@ -312,7 +302,6 @@
             const askExampleQuestion = (question: string) => {
                 messageText.value = question;
 
-                // 질문을 설정한 후 자동 크기 조절
                 nextTick(() => {
                     autoResize();
                 });
@@ -330,7 +319,6 @@
                 router.push('/chat');
             };
 
-            // 날짜 포맷팅 (YYYY년 MM월 DD일)
             const formatDate = (dateString: string): string => {
                 try {
                     const date = new Date(dateString);
@@ -376,7 +364,6 @@
 </script>
 
 <style scoped>
-    /* 기존 스타일 */
     .start-chat-container {
         max-width: 900px;
         margin: 0 auto;
@@ -522,7 +509,7 @@
         border: 1px solid #e6e6e6;
         border-radius: 8px;
         cursor: pointer;
-        transition: all 0.3s ease; /* 전환 시간 0.2s에서 0.3s로 늘림 */
+        transition: all 0.3s ease;
         color: #333;
         font-size: 0.95rem;
         font-weight: 400;
@@ -530,11 +517,11 @@
     }
 
     .example-question:hover:not(:disabled) {
-        background-color: #e1f0ff; /* 호버 시 좀 더 밝은 파란색 배경 */
+        background-color: #e1f0ff;
         border-color: #99caff;
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 그림자 효과 강화 */
-        color: #0056b3; /* 호버 시 텍스트 색상 변경 */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        color: #0056b3;
     }
 
     .example-question:active {
@@ -550,7 +537,6 @@
         box-shadow: none;
     }
 
-    /* 새로 추가된 네비게이션 토글 버튼 스타일 */
     .nav-toggle-button {
         position: absolute;
         left: 0;
@@ -573,7 +559,6 @@
         background-color: rgba(0, 0, 0, 0.05);
     }
 
-    /* 새로 추가된 네비게이션 사이드바 스타일 */
     .nav-sidebar {
         position: fixed;
         left: 0;
@@ -692,7 +677,6 @@
         background-color: #0056b3;
     }
 
-    /* 오버레이 스타일 */
     .nav-overlay {
         position: fixed;
         top: 0;
@@ -709,27 +693,6 @@
         opacity: 1;
     }
 
-    /* 애니메이션 트랜지션 스타일 추가 */
-    .slide-enter-active,
-    .slide-leave-active {
-        transition:
-            transform 0.3s ease,
-            opacity 0.3s ease;
-    }
-
-    .slide-enter-from,
-    .slide-leave-to {
-        transform: translateX(-100%);
-        opacity: 0;
-    }
-
-    .slide-enter-to,
-    .slide-leave-from {
-        transform: translateX(0);
-        opacity: 1;
-    }
-
-    /* 반응형 스타일 */
     @media (max-width: 768px) {
         .example-questions {
             grid-template-columns: 1fr;
@@ -783,7 +746,6 @@
         border-color: #007bff;
     }
 
-    /* 반응형 스타일에서 모바일 텍스트 에어리어 높이 조정 */
     @media (max-width: 768px) {
         .start-chat-input {
             min-height: 50px;

@@ -1,7 +1,6 @@
 <template>
     <AppLayout>
         <div class="chatbot-container">
-            <!-- 토글 가능한 좌측 사이드바 (채팅 세션 목록) -->
             <transition name="slide">
                 <div
                     v-if="isSidebarOpen"
@@ -15,10 +14,8 @@
                 </div>
             </transition>
 
-            <!-- 메인 채팅 영역 -->
             <div class="chatbot-main" :class="{ 'sidebar-open': isSidebarOpen }">
                 <div class="chat-header">
-                    <!-- 사이드바 토글 버튼 추가 -->
                     <button @click="toggleSidebar" class="sidebar-toggle-button">
                         <svg
                             width="24"
@@ -53,20 +50,17 @@
 
                     <h1 @click="handleGoMain">AWS Cloud Agent</h1>
                     <p class="chat-description">운영 정보/메뉴얼 질의</p>
-                    <!-- 진행 중인 질의가 있을 때 상태 표시 -->
                     <div v-if="store.waitingForResponse" class="processing-indicator">
                         <div class="processing-spinner"></div>
                         <span>질의 처리 중...</span>
                     </div>
                 </div>
 
-                <!-- 오류 메시지 표시 영역 -->
                 <div v-if="store.error" class="error-message">
                     {{ store.error }}
                     <button @click="dismissError" class="dismiss-error">×</button>
                 </div>
 
-                <!-- 세션 전환 시도 경고 모달 -->
                 <div v-if="showSessionChangeWarning" class="session-warning-modal">
                     <div class="session-warning-content">
                         <h3>⚠️ 주의</h3>
@@ -83,7 +77,6 @@
                     </div>
                 </div>
 
-                <!-- 채팅 메시지 표시 영역 -->
                 <div class="chat-messages" ref="messagesContainer">
                     <template v-if="store.currentSession && store.currentMessages.length > 0">
                         <ChatMessage
@@ -93,7 +86,6 @@
                         />
                     </template>
 
-                    <!-- 채팅이 없을 때 표시할 시작 화면 -->
                     <div v-else class="empty-chat">
                         <div class="empty-chat-content">
                             <img src="@/assets/agent-logo.png" alt="AWS Logo" class="aws-logo" />
@@ -150,7 +142,6 @@
                     </div>
                 </div>
 
-                <!-- 채팅 입력 영역 -->
                 <div class="input-container">
                     <div class="chat-input-wrapper">
                         <textarea
@@ -164,7 +155,6 @@
                             @input="autoResize"
                         ></textarea>
 
-                        <!-- 대화 컨텍스트 기억 토글 -->
                         <div class="context-toggle-container">
                             <label class="context-toggle-label">
                                 <input
@@ -274,35 +264,29 @@
             const messageText = ref('');
             const inputRef = ref<HTMLTextAreaElement | null>(null);
             const showCancelIcon = ref(false);
-            const isCached = ref(true); // 대화 컨텍스트 기억 토글 상태 (기본값: true)
+            const isCached = ref(true);
 
             const showSessionChangeWarning = ref(false);
             const targetSessionId = ref<string | null>(null);
 
-            // 사이드바 상태 관리 (토글 기능 추가)
-            const isSidebarOpen = ref(false); // 기본적으로 사이드바가 닫힌 상태로 시작
+            const isSidebarOpen = ref(false);
 
             const toggleSidebar = () => {
                 isSidebarOpen.value = !isSidebarOpen.value;
             };
 
-            // 윈도우 크기 변화에 대응하는 함수
             const handleResize = () => {
-                // 모바일 환경(<768px)에서 사이드바가 열려있을 경우 닫기
                 if (window.innerWidth < 768 && isSidebarOpen.value) {
                     isSidebarOpen.value = false;
                 }
             };
 
-            // Enter 키 처리 (Shift+Enter는 줄바꿈)
             const handleEnterKey = (e: KeyboardEvent) => {
-                if (e.shiftKey) return; // Shift+Enter는 줄바꿈
+                if (e.shiftKey) return;
 
                 if (store.waitingForResponse) {
-                    // 요청 중이면 취소
                     cancelRequest();
                 } else {
-                    // 아니면 메시지 전송
                     sendMessage();
                 }
             };
@@ -310,28 +294,22 @@
             const handleKeydown = (e: KeyboardEvent) => {
                 if (e.key === 'Enter') {
                     if (e.shiftKey) {
-                        // Shift+Enter는 줄바꿈 허용 (기본 동작 유지)
                         return;
                     } else {
-                        // Enter만 누른 경우
                         e.preventDefault();
                         if (store.waitingForResponse) {
-                            // 요청 중이면 취소
                             cancelRequest();
                         } else {
-                            // 아니면 메시지 전송
                             sendMessage();
                         }
                     }
                 } else if (e.key === 'Escape') {
-                    // ESC 키 처리 (요청 취소)
                     if (store.waitingForResponse) {
                         cancelRequest();
                     }
                 }
             };
 
-            // ESC 키 처리 (요청 취소)
             const handleEscKey = () => {
                 console.log('handleEscKey 호출됨, waitingForResponse:', store.waitingForResponse);
                 if (store.waitingForResponse) {
@@ -342,19 +320,15 @@
                 }
             };
 
-            // 텍스트 에어리어 자동 크기 조절
             const autoResize = () => {
                 if (!inputRef.value) return;
 
-                // 높이 초기화
                 inputRef.value.style.height = 'auto';
 
-                // 새 높이 설정 (스크롤 높이 기준, 최대 5줄 정도로 제한)
                 const newHeight = Math.min(inputRef.value.scrollHeight, 150);
                 inputRef.value.style.height = `${newHeight}px`;
             };
 
-            // 요청 취소
             const cancelRequest = () => {
                 console.log('취소 요청 중...');
                 if (store.waitingForResponse) {
@@ -427,10 +401,8 @@
 
                     initialSetupDone.value = true;
 
-                    // 윈도우 리사이즈 이벤트 리스너 등록
                     window.addEventListener('resize', handleResize);
 
-                    // ESC 키 이벤트 리스너 등록 (전역으로)
                     const handleGlobalKeydown = (e: KeyboardEvent) => {
                         if (e.key === 'Escape') {
                             console.log('ESC 키가 눌렸습니다');
@@ -480,25 +452,19 @@
                         store.currentSession.messages = [];
                     }
 
-                    // UI 텍스트 입력창 초기화 (메시지 전송 전에)
                     if (!text) {
                         messageText.value = '';
-                        // 텍스트 에어리어 높이 초기화
                         if (inputRef.value) {
                             inputRef.value.style.height = 'auto';
                         }
                     }
 
-                    // 모바일에서 메시지 전송 시 사이드바 닫기
                     if (window.innerWidth < 768) {
                         isSidebarOpen.value = false;
                     }
 
-                    // store.sendMessage를 사용하여 메시지 전송 (중복 제거)
-                    // store에서 모든 UI 업데이트와 API 호출을 처리
                     await store.sendMessage(messageToSend);
 
-                    // 스크롤 조정
                     await nextTick();
                     scrollToBottom();
                 } catch (error) {
@@ -509,12 +475,10 @@
                 }
             };
 
-            // 예시 질문 전송
             const askExampleQuestion = async (question: string) => {
-                if (store.waitingForResponse) return; // 이미 응답 대기 중이면 중단
+                if (store.waitingForResponse) return;
 
                 try {
-                    // 즉시 예시 질문 전송 (세션 생성 대기 없이)
                     await sendMessage(question);
                 } catch (error) {
                     console.error('예시 질문 전송 오류:', error);
@@ -522,63 +486,50 @@
                 }
             };
 
-            // 세션 클릭 처리 (대기 중일 때 모달 표시)
             const handleSessionClick = (sessionId: string) => {
                 if (store.waitingForResponse) {
-                    // 대기 중이면 경고 모달 표시
                     targetSessionId.value = sessionId;
                     showSessionChangeWarning.value = true;
                 } else {
-                    // 대기 중이 아니면 바로 세션 전환
                     store.selectSession(sessionId);
 
-                    // 모바일에서는 세션 선택 후 사이드바 닫기
                     if (window.innerWidth < 768) {
                         isSidebarOpen.value = false;
                     }
                 }
             };
 
-            // 세션 전환 취소
             const cancelSessionChange = () => {
                 targetSessionId.value = null;
                 showSessionChangeWarning.value = false;
             };
 
-            // 세션 전환 확인
             const confirmSessionChange = async () => {
                 if (targetSessionId.value) {
-                    // 현재 응답 대기 상태 해제
                     store.cancelRequest();
                     store.waitingForResponse = false;
 
-                    // 세션 전환
                     await store.selectSession(targetSessionId.value);
 
-                    // 모바일에서는 세션 선택 후 사이드바 닫기
                     if (window.innerWidth < 768) {
                         isSidebarOpen.value = false;
                     }
 
-                    // 모달 닫기
                     targetSessionId.value = null;
                     showSessionChangeWarning.value = false;
                 }
             };
 
-            // 봇 응답 생성 함수 (store의 취소 토큰 사용)
             const generateBotResponse = async (userMessage: string): Promise<BotResponse> => {
                 try {
-                    // API URL 설정
                     const apiUrl = import.meta.env.VITE_API_DEST || 'http://localhost:8000';
 
-                    // API 호출 시 isCached 값을 포함하고 store의 취소 토큰 사용
                     const response = await axios.post(
                         `${apiUrl}/llm1`,
                         {
                             text: userMessage,
                             sessionId: store.currentSession?.sessionId,
-                            isCached: isCached.value, // 토글 상태 전송
+                            isCached: isCached.value,
                         },
                         {
                             headers: {
@@ -591,9 +542,7 @@
                         },
                     );
 
-                    // API 응답 처리 로직
                     if (response.data) {
-                        // inference 필드가 있는 경우 처리 (추가)
                         if (response.data.inference) {
                             return {
                                 text: response.data.answer || '쿼리 결과 없음',
@@ -606,7 +555,6 @@
                             response.data.query_string &&
                             response.data.elapsed_time !== undefined
                         ) {
-                            // 케이스 1: 쿼리 정보가 포함된 응답
                             return {
                                 text: response.data.answer || '쿼리 결과 없음',
                                 query_string: response.data.query_string,
@@ -619,7 +567,6 @@
                                 elapsed_time: response.data.elapsed_time,
                             };
                         } else if (Array.isArray(response.data.answer)) {
-                            // 기존 형식 - 배열 형태의 응답
                             const sortedItems = [...response.data.answer].sort(
                                 (a, b) => a.rank_order - b.rank_order,
                             );
@@ -629,12 +576,10 @@
                                     .join('\n\n'),
                             };
                         } else if (typeof response.data.answer === 'string') {
-                            // 기존 형식 - 문자열 형태의 응답
                             return {
                                 text: response.data.answer,
                             };
                         } else {
-                            // 예상치 못한 형식
                             return {
                                 text: JSON.stringify(response.data.answer),
                             };
@@ -645,7 +590,6 @@
                         text: '죄송합니다. 유효한 응답 데이터를 받지 못했습니다.',
                     };
                 } catch (error) {
-                    // 오류 처리는 그대로 유지
                     if (axios.isCancel(error)) {
                         throw error;
                     }
@@ -656,17 +600,15 @@
                 }
             };
 
-            // 타이핑 애니메이션 시뮬레이션
             const simulateTyping = async (messageId: string, fullText: string) => {
                 if (!store.currentSession || !Array.isArray(store.currentSession.messages)) return;
 
                 const message = store.currentSession.messages.find((m) => m.id === messageId);
                 if (!message) return;
 
-                const typingSpeed = 10; // 문자당 타이핑 시간 (밀리초)
-                const maxTypingTime = 2000; // 최대 타이핑 시간 (밀리초)
+                const typingSpeed = 10;
+                const maxTypingTime = 2000;
 
-                // 최대 타이핑 시간에 맞춰 속도 조절
                 const totalTypingTime = Math.min(fullText.length * typingSpeed, maxTypingTime);
                 const charInterval = totalTypingTime / fullText.length;
 
@@ -675,7 +617,6 @@
                 for (let i = 0; i < fullText.length; i++) {
                     await new Promise((resolve) => setTimeout(resolve, charInterval));
 
-                    // 메시지가 여전히 존재하는지 확인
                     if (!store.currentSession || !Array.isArray(store.currentSession.messages)) {
                         return;
                     }
@@ -685,11 +626,9 @@
                     );
                     if (!updatedMessage) return;
 
-                    // 다음 글자 추가
                     updatedMessage.displayText = fullText.substring(0, i + 1);
                 }
 
-                // 애니메이션 완료 상태로 변경
                 if (!store.currentSession || !Array.isArray(store.currentSession.messages)) return;
 
                 const completedMessage = store.currentSession.messages.find(
@@ -700,9 +639,8 @@
                 }
             };
 
-            // 대화 내용 지우기
             const clearChat = async () => {
-                if (store.waitingForResponse) return; // 대기 중이면 중단
+                if (store.waitingForResponse) return;
 
                 if (confirm('대화 내용을 모두 지우시겠습니까?')) {
                     try {
@@ -714,12 +652,10 @@
                 }
             };
 
-            // 오류 메시지 닫기
             const dismissError = () => {
                 store.error = null;
             };
 
-            // 메인 페이지로 이동
             const handleGoMain = () => {
                 if (store.waitingForResponse) {
                     if (
@@ -738,7 +674,7 @@
                 messageText,
                 inputRef,
                 showCancelIcon,
-                isCached, // 토글 상태 노출
+                isCached,
                 sendMessage,
                 askExampleQuestion,
                 clearChat,
@@ -751,8 +687,8 @@
                 handleSessionClick,
                 cancelSessionChange,
                 confirmSessionChange,
-                isSidebarOpen, // 사이드바 상태 노출
-                toggleSidebar, // 사이드바 토글 함수 노출
+                isSidebarOpen,
+                toggleSidebar,
                 handleEnterKey,
                 handleEscKey,
                 handleKeydown,
@@ -770,10 +706,9 @@
         max-height: calc(100vh - 40px);
         background-color: #f8f9fa;
         position: relative;
-        overflow-x: hidden; /* 너비 변경 시 스크롤바 방지 */
+        overflow-x: hidden;
     }
 
-    /* 채팅 목록 사이드바 스타일 */
     .chatbot-sidebar {
         min-width: 300px;
         width: 300px;
@@ -788,7 +723,6 @@
         transition: transform 0.3s ease-in-out;
     }
 
-    /* 모바일에서는 사이드바를 고정 위치에 표시 */
     @media (max-width: 767px) {
         .chatbot-sidebar {
             position: fixed;
@@ -797,69 +731,12 @@
         }
     }
 
-    /* 사이드바 헤더 스타일 */
-    .sidebar-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 16px;
-        border-bottom: 1px solid #e5e5e5;
-        background-color: #f8f9fa;
-    }
-
     .sidebar-header h2 {
         margin: 0;
         font-size: 1.2rem;
         color: #333;
     }
 
-    .close-sidebar-button {
-        background: none;
-        border: none;
-        font-size: 1.5rem;
-        cursor: pointer;
-        color: #666;
-        padding: 5px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        transition: background-color 0.2s;
-    }
-
-    .close-sidebar-button:hover {
-        background-color: rgba(0, 0, 0, 0.05);
-    }
-
-    /* 사이드바 오버레이 스타일 */
-    .sidebar-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 90;
-    }
-
-    /* 사이드바 애니메이션 트랜지션 */
-    .slide-enter-active,
-    .slide-leave-active {
-        transition: transform 0.3s ease-in-out;
-    }
-
-    .slide-enter-from,
-    .slide-leave-to {
-        transform: translateX(-300px);
-    }
-
-    .slide-enter-to,
-    .slide-leave-from {
-        transform: translateX(0);
-    }
-
-    /* 사이드바 비활성화 스타일 */
     .disabled-sidebar {
         position: relative;
         opacity: 0.7;
@@ -886,10 +763,9 @@
         background-color: #f8f9fa;
         overflow: hidden;
         transition: all 0.3s ease-in-out;
-        will-change: width, flex; /* 브라우저에게 변경될 속성 힌트 제공 */
+        will-change: width, flex;
     }
 
-    /* 사이드바 토글 버튼 스타일 */
     .sidebar-toggle-button {
         background: none;
         border: none;
@@ -916,7 +792,7 @@
     .chat-header {
         margin-bottom: 20px;
         padding-bottom: 15px;
-        padding-left: 50px; /* 토글 버튼 공간 확보 */
+        padding-left: 50px;
         border-bottom: 1px solid #e5e5e5;
         position: relative;
         text-align: center;
@@ -926,7 +802,6 @@
         flex-direction: column;
     }
 
-    /* 처리 중 인디케이터 스타일 */
     .processing-indicator {
         position: absolute;
         top: 0;
@@ -1014,7 +889,6 @@
         padding: 0 5px;
     }
 
-    /* 세션 전환 경고 모달 스타일 */
     .session-warning-modal {
         position: fixed;
         top: 0;
@@ -1155,7 +1029,6 @@
         margin-top: 20px;
     }
 
-    /* 반응형 스타일 */
     @media (max-width: 768px) {
         .chatbot-container {
             flex-direction: column;
@@ -1183,7 +1056,6 @@
         }
     }
 
-    /* 채팅 입력 영역 새로운 스타일 */
     .input-container {
         margin-top: 20px;
     }
@@ -1228,7 +1100,6 @@
         color: #999;
     }
 
-    /* 대화 컨텍스트 기억 토글 스타일 */
     .context-toggle-container {
         display: flex;
         align-items: center;
@@ -1332,7 +1203,7 @@
     }
 
     .send-button.cancel-mode:hover {
-        background-color: #dc3545; /* 빨간색 배경으로 변경 */
+        background-color: #dc3545;
         transform: scale(1.05);
         cursor: pointer;
     }
@@ -1384,7 +1255,6 @@
         }
     }
 
-    /* 반응형 스타일 */
     @media (max-width: 768px) {
         .context-toggle-text {
             display: none;
@@ -1400,7 +1270,6 @@
         }
     }
 
-    /* 처리 중 인디케이터 스타일 */
     .processing-indicator {
         position: absolute;
         top: 0;
@@ -1439,7 +1308,6 @@
         animation: spin 1s linear infinite;
     }
 
-    /* 세션 전환 경고 모달 스타일 */
     .session-warning-modal {
         position: fixed;
         top: 0;
