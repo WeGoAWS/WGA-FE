@@ -8,7 +8,10 @@ export const useModelsStore = defineStore('models', {
         models: [],
         loading: false,
         error: null,
-        selectedModel: undefined,
+        selectedModel: {
+            display_name: 'Claude Sonnet 3.7',
+            id: 'claude-3-7-sonnet-20250219',
+        },
     }),
 
     getters: {
@@ -85,7 +88,10 @@ export const useModelsStore = defineStore('models', {
             this.models = [];
             this.loading = false;
             this.error = null;
-            this.selectedModel = undefined;
+            this.selectedModel = {
+                display_name: 'Claude Sonnet 3.7',
+                id: 'claude-3-7-sonnet-20250219',
+            };
         },
     },
 });

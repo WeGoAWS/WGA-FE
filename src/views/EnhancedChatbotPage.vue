@@ -767,6 +767,7 @@
                 selectModel,
                 handleClickOutside,
                 modelsStore,
+                isModelDropdownOpen,
             };
         },
     });
@@ -1551,9 +1552,10 @@
 
     .model-dropdown {
         position: absolute;
-        top: 100%;
-        left: 0;
+        left: -30px;
         right: 0;
+        bottom: 35px;
+        width: fit-content;
         background-color: white;
         border: 1px solid #dee2e6;
         border-radius: 8px;
@@ -1565,6 +1567,7 @@
     }
 
     .model-option {
+        width: max-content;
         padding: 8px 12px;
         cursor: pointer;
         transition: background-color 0.2s ease;
