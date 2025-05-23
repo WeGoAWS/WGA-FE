@@ -111,6 +111,23 @@
                     </button>
 
                     <h1 @click="getHealth">AWS Cloud Agent</h1>
+
+                    <button @click="handleLogout" class="logout-button" title="로그아웃">
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16,17 21,12 16,7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </button>
                 </div>
                 <p class="start-chat-description">클라우드 운영 정보 질의응답 서비스</p>
             </div>
@@ -408,6 +425,11 @@
                 }
             };
 
+            const handleLogout = () => {
+                localStorage.clear();
+                window.location.reload();
+            };
+
             return {
                 messageText,
                 chatHistoryStore,
@@ -428,6 +450,7 @@
                 cancelDeleteAll,
                 confirmDeleteAll,
                 settingsStore,
+                handleLogout,
             };
         },
     });
@@ -953,5 +976,33 @@
     .slide-leave-from {
         transform: translateX(0);
         opacity: 1;
+    }
+
+    .logout-button {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #6c757d;
+        cursor: pointer;
+        padding: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        transition: all 0.2s ease;
+    }
+
+    .logout-button:hover {
+        background-color: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+
+    .logout-button:active {
+        transform: translateY(-50%) scale(0.95);
     }
 </style>
