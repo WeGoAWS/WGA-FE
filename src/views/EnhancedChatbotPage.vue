@@ -274,7 +274,7 @@
 </template>
 
 <script lang="ts">
-    import { defineComponent, nextTick, onMounted, ref, watch } from 'vue';
+    import { computed, defineComponent, nextTick, onMounted, ref, watch } from 'vue';
     import { useRouter } from 'vue-router';
     import axios from 'axios';
     import AppLayout from '@/layouts/AppLayout.vue';
@@ -283,6 +283,7 @@
     import { useChatHistoryStore } from '@/stores/chatHistoryStore';
     import type { BotResponse } from '@/types/chat';
     import { useModelsStore } from '@/stores/models';
+    import { useSettingsStore } from '@/stores/settings.ts';
 
     export default defineComponent({
         name: 'EnhancedChatbotPage',
@@ -296,13 +297,13 @@
         setup() {
             const router = useRouter();
             const store = useChatHistoryStore();
+            const settingsStore = useSettingsStore();
             const messagesContainer = ref<HTMLElement | null>(null);
             const initialSetupDone = ref(false);
             const pendingQuestionProcessed = ref(false);
             const messageText = ref('');
             const inputRef = ref<HTMLTextAreaElement | null>(null);
             const showCancelIcon = ref(false);
-            const isCached = ref(true);
 
             const showSessionChangeWarning = ref(false);
             const targetSessionId = ref<string | null>(null);
@@ -313,6 +314,11 @@
             const modelSelectorRef = ref<HTMLElement | null>(null);
 
             const modelsStore = useModelsStore();
+
+            const isCached = computed({
+                get: () => settingsStore.isCached,
+                set: (value: boolean) => settingsStore.setIsCached(value),
+            });
 
             const toggleSidebar = () => {
                 isSidebarOpen.value = !isSidebarOpen.value;
@@ -404,6 +410,7 @@
 
             onMounted(async () => {
                 try {
+                    settingsStore.loadFromStorage();
                     const pendingQuestion = sessionStorage.getItem('pendingQuestion');
                     const shouldCreateNewSession =
                         sessionStorage.getItem('createNewSession') === 'true';
@@ -525,7 +532,7 @@
                         isSidebarOpen.value = false;
                     }
 
-                    await store.sendMessage(messageToSend);
+                    await store.sendMessage(messageToSend, settingsStore.isCached);
 
                     await nextTick();
                     scrollToBottom();
@@ -743,7 +750,6 @@
                 messageText,
                 inputRef,
                 showCancelIcon,
-                isCached,
                 sendMessage,
                 askExampleQuestion,
                 clearChat,
@@ -768,6 +774,8 @@
                 handleClickOutside,
                 modelsStore,
                 isModelDropdownOpen,
+                settingsStore,
+                isCached,
             };
         },
     });
