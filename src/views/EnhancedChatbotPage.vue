@@ -1552,7 +1552,7 @@
 
     .model-dropdown {
         position: absolute;
-        left: -30px;
+        left: 0;
         right: 0;
         bottom: 35px;
         width: fit-content;
@@ -1567,7 +1567,7 @@
     }
 
     .model-option {
-        width: max-content;
+        width: initial;
         padding: 8px 12px;
         cursor: pointer;
         transition: background-color 0.2s ease;

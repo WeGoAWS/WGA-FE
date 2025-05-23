@@ -9,8 +9,8 @@ export const useModelsStore = defineStore('models', {
         loading: false,
         error: null,
         selectedModel: {
-            display_name: 'Claude Sonnet 3.7',
-            id: 'claude-3-7-sonnet-20250219',
+            display_name: 'Claude Sonnet 4',
+            id: 'claude-sonnet-4-20250514',
         },
     }),
 
@@ -46,13 +46,14 @@ export const useModelsStore = defineStore('models', {
                 if (response.data && response.data.models) {
                     this.models = response.data.models;
 
-                    if (this.models.length > 0 && !this.selectedModel) {
-                        this.selectedModel = this.models[0];
-                    }
+                    this.selectedModel = {
+                        id: 'claude-sonnet-4-20250514',
+                        display_name: 'Claude Sonnet 4',
+                    };
                 } else {
                     this.selectedModel = {
-                        id: 'claude-3-7-sonnet-20250219',
-                        display_name: 'Claude Sonnet 3.7',
+                        id: 'claude-sonnet-4-20250514',
+                        display_name: 'Claude Sonnet 4',
                     };
                 }
 
@@ -89,8 +90,8 @@ export const useModelsStore = defineStore('models', {
             this.loading = false;
             this.error = null;
             this.selectedModel = {
-                display_name: 'Claude Sonnet 3.7',
-                id: 'claude-3-7-sonnet-20250219',
+                display_name: 'Claude Sonnet 4',
+                id: 'claude-sonnet-4-20250514',
             };
         },
     },
