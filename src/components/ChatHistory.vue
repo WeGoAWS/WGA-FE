@@ -45,30 +45,32 @@
                     </div>
                 </div>
             </div>
-            <button
-                @click="confirmDeleteAllSessions"
-                class="delete-all-button"
-                :disabled="disabled"
-            >
-                <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
+            <div class="delete-all-button-container">
+                <button
+                    @click="confirmDeleteAllSessions"
+                    class="delete-all-button"
+                    :disabled="disabled"
                 >
-                    <polyline points="3,6 5,6 21,6"></polyline>
-                    <path
-                        d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"
-                    ></path>
-                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                    <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-                <span>대화 전체 삭제</span>
-            </button>
+                    <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <polyline points="3,6 5,6 21,6"></polyline>
+                        <path
+                            d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"
+                        ></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                    <span>대화 전체 삭제</span>
+                </button>
+            </div>
         </div>
 
         <div v-else class="empty-sessions">
@@ -458,10 +460,19 @@
         opacity: 1;
     }
 
+    .delete-all-button-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 320px;
+        height: 100px;
+        background-color: white;
+    }
+
     .delete-all-button {
-        position: absolute;
-        bottom: 5px;
-        left: 20px;
+        position: fixed;
+        bottom: 15px;
+        left: 30px;
         width: 260px;
         display: flex;
         align-items: center;
