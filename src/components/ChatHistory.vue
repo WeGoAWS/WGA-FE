@@ -311,6 +311,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        flex-shrink: 0;
     }
 
     .sidebar-header h2 {
@@ -355,6 +356,7 @@
         padding: 32px 16px;
         gap: 12px;
         color: #666;
+        flex: 1;
     }
 
     .spinner {
@@ -377,11 +379,17 @@
 
     .chat-sessions {
         flex: 1;
-        overflow-y: auto;
-        padding: 12px;
-        padding-bottom: 72px;
         display: flex;
         flex-direction: column;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .chat-sessions > div:first-child {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        padding-bottom: 12px;
     }
 
     .chat-session-item {
@@ -461,25 +469,25 @@
     }
 
     .delete-all-button-container {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 320px;
-        height: 100px;
+        flex-shrink: 0;
+        height: 80px;
         background-color: white;
+        border-top: 1px solid #eee;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 15px;
+        position: relative;
     }
 
     .delete-all-button {
-        position: fixed;
-        bottom: 15px;
-        left: 30px;
-        width: 260px;
+        width: 100%;
+        max-width: 260px;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
-        height: 60px;
-        margin: 0;
+        height: 50px;
         background-color: #f8f9fa;
         border: 1px solid #dc3545;
         border-radius: 8px;
@@ -488,20 +496,17 @@
         font-weight: 500;
         font-size: 0.95rem;
         transition: all 0.2s ease;
-        z-index: 10;
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
     }
 
     .delete-all-button:hover:not(:disabled) {
         background-color: #dc3545;
         color: white;
-        box-shadow: 0 -4px 15px rgba(220, 53, 69, 0.3);
+        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
     }
 
     .delete-all-button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
     }
 
     .delete-all-button svg {
@@ -509,13 +514,12 @@
     }
 
     .empty-sessions {
+        flex: 1;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        height: 100%;
         padding: 20px;
-        padding-bottom: 80px;
         color: #666;
         text-align: center;
     }
@@ -646,16 +650,13 @@
         }
 
         .delete-all-button {
-            height: 55px;
+            height: 45px;
             font-size: 0.9rem;
         }
 
-        .chat-sessions {
-            padding-bottom: 68px;
-        }
-
-        .empty-sessions {
-            padding-bottom: 75px;
+        .delete-all-button-container {
+            height: 75px;
+            padding: 12px;
         }
     }
 </style>
